@@ -3,7 +3,7 @@ title: Introduction
 description: Find every TLS certificate you serve and when it expires.
 ---
 
-expirely connects to each target you give it, completes a TLS handshake, reads the certificate chain and closes the connection. It tells you which certificates are expired, which expire soon and which targets could not be read, in a table for people and in JSON for CI and AI agents.
+expirely connects to each target you give it, completes a TLS handshake, reads the certificate chain and closes the connection. It tells you which certificates are expired, which expire soon and which targets could not be read, in a short list for people and in JSON for CI and AI agents.
 
 It sends no application data, holds no credentials and never touches a private key. Expired, untrusted and mismatched chains are read and reported, not refused.
 
@@ -12,15 +12,16 @@ It sends no application data, holds no credentials and never touches a private k
 </Note>
 
 ```
-$ expirely example.com expired.badssl.com self-signed.badssl.com wrong.host.badssl.com localhost:1
-TARGET                      STATUS   DAYS     EXPIRES               TRUSTED  DETAIL
-expired.badssl.com:443      expired  -4246    2015-04-12 23:59 UTC  no       issuer COMODO RSA Domain Validation Secure Server CA
-localhost:1                 error    unknown  unknown               unknown  dial localhost:1: dial tcp [::1]:1: connect: connection refused
-wrong.host.badssl.com:443   ok       31       2026-12-28 20:02 UTC  no       issuer YR1
-example.com:443             ok       88       2027-02-22 23:53 UTC  yes      issuer Cloudflare TLS Issuing ECC CA 3
-self-signed.badssl.com:443  ok       727      2028-11-23 21:00 UTC  no       issuer *.badssl.com
+$ expirely example.com expired.badssl.com wrong.host.badssl.com localhost:1 self-signed.badssl.com untrusted-root.badssl.com
 
-5 targets: 1 expired, 0 expiring, 1 unreadable, 3 ok
+  expired  expired.badssl.com         4,246 days ago      Apr 12 2015
+  failed   localhost:1                connection refused
+  ok       wrong.host.badssl.com      31 days             Dec 28 2026  wrong name
+  ok       example.com                88 days             Feb 22 2027
+  ok       self-signed.badssl.com     727 days            Nov 23 2028  self-signed
+  ok       untrusted-root.badssl.com  727 days            Nov 23 2028  untrusted issuer
+
+  1 expired, 1 failed, 4 ok in 622ms
 ```
 
 ## Get started

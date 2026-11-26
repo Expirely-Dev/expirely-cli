@@ -260,34 +260,17 @@ func TestRunScanText(t *testing.T) {
 		t.Errorf("exit code = %d, want %d", code, ExitFindings)
 	}
 	lines := strings.Split(stdout, "\n")
-	if !strings.HasPrefix(lines[0], "TARGET") {
-		t.Fatalf("first line = %q, want the table header", lines[0])
+	if len(lines) < 5 || lines[0] != "" {
+		t.Fatalf("stdout = %q, want a blank line, two rows, a blank line and a summary", stdout)
 	}
-	if !strings.Contains(lines[1], "expired") || !strings.Contains(lines[2], "ok") {
+	if !strings.HasPrefix(lines[1], "  expired  localhost:") || !strings.HasPrefix(lines[2], "  ok       localhost:") {
 		t.Errorf("rows = %q, %q, want the expired row first", lines[1], lines[2])
 	}
-	if !strings.Contains(stdout, "2 targets: 1 expired, 0 expiring, 0 unreadable, 1 ok") {
-		t.Errorf("stdout = %q, want the summary line", stdout)
+	if !strings.HasPrefix(lines[4], "  1 expired, 1 ok in ") {
+		t.Errorf("summary = %q, want counts and the elapsed time", lines[4])
 	}
-}
-
-func TestCommonName(t *testing.T) {
-	tests := map[string]string{
-		"CN=R11,O=Let's Encrypt,C=US": "R11",
-		"CN=only":                     "only",
-		`CN=a\,b,O=x`:                 `a\,b`,
-		"O=No CN,C=US":                "O=No CN,C=US",
-	}
-	for dn, want := range tests {
-		if got := commonName(dn); got != want {
-			t.Errorf("commonName(%q) = %q, want %q", dn, got, want)
-		}
-	}
-}
-
-func TestClean(t *testing.T) {
-	if got := clean("ok\x1b[31mred\x07\n"); got != "ok[31mred" {
-		t.Errorf("clean() = %q, want control characters removed", got)
+	if strings.Contains(stdout, "\x1b[") {
+		t.Errorf("stdout = %q, want no escape codes from a zero Style", stdout)
 	}
 }
 

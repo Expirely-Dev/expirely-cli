@@ -37,7 +37,24 @@ The status comes from the earliest `NotAfter` in the chain the server sends, so 
 
 ## Output
 
-Results go to stdout and errors to stderr. The output is JSON when `--json` is set or stdout is not a terminal, and a table otherwise. The table lists the most urgent targets first and ends with a summary line; JSON keeps the order of the targets and is described in [Output](/reference/output). Text taken from certificates and errors has its control characters removed before it reaches a terminal.
+Results go to stdout and errors to stderr. The output is JSON when `--json` is set or stdout is not a terminal, and text otherwise. JSON keeps the order of the targets and is described in [Output](/reference/output).
+
+The text output has one line per target, most urgent first, then the counts and how long the scan took:
+
+```
+  expired  expired.badssl.com         4,246 days ago      Apr 12 2015
+  failed   localhost:1                connection refused
+  ok       wrong.host.badssl.com      31 days             Dec 28 2026  wrong name
+
+  1 expired, 1 failed, 1 ok in 622ms
+```
+
+- The status comes first: `expired`, `expiring`, `failed` or `ok`. `failed` is the `error` status of JSON.
+- The default port is left out, as in `example.com`; other ports are shown.
+- A chain that is not trusted says why: `self-signed`, `untrusted issuer`, `wrong name` or `not trusted`. An expired chain needs no note.
+- In a terminal with color, `expired` and `failed` are red, `expiring` is yellow and `ok` is green. With `NO_COLOR` set or `TERM=dumb` the text is the same without color.
+
+Text taken from certificates and errors has its control characters removed before it reaches a terminal.
 
 ## Exit codes
 

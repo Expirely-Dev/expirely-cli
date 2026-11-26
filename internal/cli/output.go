@@ -8,11 +8,10 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"text/tabwriter"
 	"time"
-	"unicode"
 
 	"github.com/bycavii/expirely-cli/internal/scan"
+	"github.com/bycavii/expirely-cli/internal/ui"
 )
 
 // report is the JSON document a scan prints; its field names are part of
@@ -46,7 +45,7 @@ func fail(s Streams, jsonOut bool, e *Error) int {
 		}
 		return code
 	}
-	fmt.Fprintf(s.Stderr, "expirely: %s\n", clean(e.Message))
+	fmt.Fprintf(s.Stderr, "expirely: %s\n", ui.Clean(e.Message))
 	if code == ExitUsage {
 		fmt.Fprintln(s.Stderr, "Run expirely --help to see every flag.")
 	}
@@ -67,10 +66,18 @@ var urgency = map[scan.Status]int{
 	scan.StatusOK:       3,
 }
 
-// writeText prints the findings as a table, most urgent first, then a
-// summary line. Values read from certificates and errors pass through clean
-// before they reach a terminal.
-func writeText(w io.Writer, r report) {
+var trustWords = map[string]string{
+	scan.TrustSelfSigned:       "self-signed",
+	scan.TrustUnknownAuthority: "untrusted issuer",
+	scan.TrustNameMismatch:     "wrong name",
+	scan.TrustInvalid:          "not trusted",
+}
+
+// writeText prints one line per target, most urgent first, then a summary
+// with the time the scan took. Cells are padded as plain text and styled
+// afterwards, so the plain render and the styled render line up the same.
+// Text read from certificates and errors passes through ui.Clean.
+func writeText(w io.Writer, st ui.Style, r report, elapsed time.Duration) {
 	rows := slices.Clone(r.Results)
 	slices.SortStableFunc(rows, func(a, b scan.Finding) int {
 		if c := cmp.Compare(urgency[a.Status], urgency[b.Status]); c != 0 {
@@ -79,17 +86,90 @@ func writeText(w io.Writer, r report) {
 		return cmp.Compare(days(a), days(b))
 	})
 
-	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "TARGET\tSTATUS\tDAYS\tEXPIRES\tTRUSTED\tDETAIL")
-	for _, f := range rows {
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n",
-			clean(f.Target), f.Status, daysText(f), expiresText(f), trustedText(f), clean(detail(f)))
+	cells := make([][4]string, len(rows))
+	var width [4]int
+	for i, f := range rows {
+		cells[i] = [4]string{statusWord(f.Status), displayTarget(f.Target), when(f), date(f)}
+		for c, text := range cells[i] {
+			width[c] = max(width[c], len(text))
+		}
 	}
-	_ = tw.Flush()
 
-	fmt.Fprintf(w, "\n%d targets: %d expired, %d expiring, %d unreadable, %d ok\n",
-		len(r.Results), r.Summary[string(scan.StatusExpired)], r.Summary[string(scan.StatusExpiring)],
-		r.Summary[string(scan.StatusError)], r.Summary[string(scan.StatusOK)])
+	var b strings.Builder
+	b.WriteString("\n")
+	for i, f := range rows {
+		texts := []string{cells[i][0], cells[i][1], cells[i][2], cells[i][3], note(f)}
+		last := len(texts) - 1
+		for last > 0 && texts[last] == "" {
+			last--
+		}
+		b.WriteString(" ")
+		for c := 0; c <= last; c++ {
+			text := texts[c]
+			if c < last {
+				text = pad(text, width[c])
+			}
+			b.WriteString(" ")
+			b.WriteString(cellStyle(st, f.Status, c, text))
+			if c < last {
+				b.WriteString(" ")
+			}
+		}
+		b.WriteString("\n")
+	}
+	b.WriteString("\n  ")
+	b.WriteString(summary(st, r))
+	b.WriteString(" ")
+	b.WriteString(st.Faint("in " + duration(elapsed)))
+	b.WriteString("\n")
+	fmt.Fprint(w, b.String())
+}
+
+// cellStyle styles column c of a row: the status in its color, the target
+// in bold, the date faint and the trust note as a remark. Trailing padding
+// stays outside the escape codes, so stripping them gives the plain line.
+func cellStyle(st ui.Style, s scan.Status, c int, text string) string {
+	word := strings.TrimRight(text, " ")
+	spaces := text[len(word):]
+	switch c {
+	case 0:
+		word = paint(st, s, word)
+	case 1:
+		word = st.Bold(word)
+	case 3:
+		word = st.Faint(word)
+	case 4:
+		word = st.Note(word)
+	}
+	return word + spaces
+}
+
+func pad(text string, width int) string {
+	return text + strings.Repeat(" ", width-len(text))
+}
+
+// displayTarget drops the default port, the way people type a host; JSON
+// keeps the full host:port.
+func displayTarget(t string) string {
+	return ui.Clean(strings.TrimSuffix(t, ":443"))
+}
+
+func statusWord(s scan.Status) string {
+	if s == scan.StatusError {
+		return "failed"
+	}
+	return string(s)
+}
+
+func paint(st ui.Style, s scan.Status, text string) string {
+	switch s {
+	case scan.StatusExpired, scan.StatusError:
+		return st.Bad(text)
+	case scan.StatusExpiring:
+		return st.Soon(text)
+	default:
+		return st.Good(text)
+	}
 }
 
 func days(f scan.Finding) int {
@@ -99,66 +179,73 @@ func days(f scan.Finding) int {
 	return *f.DaysLeft
 }
 
-func daysText(f scan.Finding) string {
-	if f.DaysLeft == nil {
-		return "unknown"
-	}
-	return strconv.Itoa(*f.DaysLeft)
-}
-
-func expiresText(f scan.Finding) string {
-	if f.ExpiresAt == nil {
-		return "unknown"
-	}
-	return f.ExpiresAt.Format("2006-01-02 15:04 UTC")
-}
-
-func trustedText(f scan.Finding) string {
-	switch {
-	case f.Trusted == nil:
-		return "unknown"
-	case *f.Trusted:
-		return "yes"
-	default:
-		return "no"
-	}
-}
-
-func detail(f scan.Finding) string {
+// when says how long a certificate has left, or how long ago it expired,
+// in whole days; for a target that could not be read it gives the reason.
+func when(f scan.Finding) string {
 	if f.Error != nil {
-		return f.Error.Message
+		return ui.Clean(f.Error.Reason)
 	}
-	if f.Leaf != nil {
-		return "issuer " + commonName(f.Leaf.Issuer)
-	}
-	return ""
-}
-
-// commonName returns the CN of a distinguished name in the form
-// x509.Name.String prints, or the whole name when it does not start with CN.
-func commonName(dn string) string {
-	cn, ok := strings.CutPrefix(dn, "CN=")
-	if !ok {
-		return dn
-	}
-	for i := 0; i < len(cn); i++ {
-		switch cn[i] {
-		case '\\':
-			i++
-		case ',':
-			return cn[:i]
+	d := days(f)
+	if f.Status == scan.StatusExpired {
+		switch d {
+		case 0:
+			return "today"
+		case -1:
+			return "1 day ago"
+		default:
+			return thousands(-d) + " days ago"
 		}
 	}
-	return cn
+	switch d {
+	case 0:
+		return "under a day"
+	case 1:
+		return "1 day"
+	default:
+		return thousands(d) + " days"
+	}
 }
 
-// clean removes control characters, so text from a certificate or a peer
-// cannot move the cursor or recolor the terminal.
-func clean(s string) string {
-	return strings.Map(func(r rune) rune {
-		if unicode.IsControl(r) {
-			return -1
+func date(f scan.Finding) string {
+	if f.ExpiresAt == nil {
+		return ""
+	}
+	return f.ExpiresAt.Format("Jan 02 2006")
+}
+
+// note names a trust problem in words. An expired chain needs no note: its
+// status already says so.
+func note(f scan.Finding) string {
+	if f.TrustIssue == nil {
+		return ""
+	}
+	return trustWords[*f.TrustIssue]
+}
+
+func summary(st ui.Style, r report) string {
+	var parts []string
+	for _, s := range []scan.Status{scan.StatusExpired, scan.StatusExpiring, scan.StatusError, scan.StatusOK} {
+		if n := r.Summary[string(s)]; n > 0 {
+			parts = append(parts, paint(st, s, strconv.Itoa(n)+" "+statusWord(s)))
 		}
-		return r
-	}, s)
+	}
+	return strings.Join(parts, ", ")
+}
+
+func thousands(n int) string {
+	s := strconv.Itoa(n)
+	for i := len(s) - 3; i > 0; i -= 3 {
+		s = s[:i] + "," + s[i:]
+	}
+	return s
+}
+
+func duration(d time.Duration) string {
+	if d < time.Second {
+		return strconv.FormatInt(max(d.Milliseconds(), 1), 10) + "ms"
+	}
+	if d < time.Minute {
+		return strconv.FormatFloat(d.Seconds(), 'f', 1, 64) + "s"
+	}
+	return d.Round(time.Second).String()
 }

@@ -7,6 +7,8 @@ import (
 	"os/signal"
 
 	"github.com/bycavii/expirely-cli/internal/cli"
+	"github.com/bycavii/expirely-cli/internal/ui"
+	"github.com/charmbracelet/colorprofile"
 )
 
 func main() {
@@ -16,6 +18,7 @@ func main() {
 		Stdout:           os.Stdout,
 		Stderr:           os.Stderr,
 		StdoutIsTerminal: isTerminal(os.Stdout),
+		Style:            ui.Style{Profile: colorprofile.Detect(os.Stdout, os.Environ())},
 	})
 	stop()
 	os.Exit(code)

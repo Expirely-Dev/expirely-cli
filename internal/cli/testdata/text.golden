@@ -1,0 +1,10 @@
+
+  expired   expired.badssl.com      4,246 days ago      Apr 12 2015
+  expiring  soon.example.com:8443   1 day               Nov 28 2026
+  failed    localhost:1             connection refused
+  ok        evil[2J.example         under a day         Nov 27 2026  untrusted issuer
+  ok        wrong.host.badssl.com   31 days             Dec 28 2026  wrong name
+  ok        example.com             88 days             Feb 22 2027
+  ok        self-signed.badssl.com  727 days            Nov 23 2028  self-signed
+
+  1 expired, 1 expiring, 1 failed, 4 ok in 412ms

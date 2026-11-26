@@ -2,7 +2,7 @@
 
 Find every TLS certificate you serve and when it expires.
 
-expirely connects to each target, completes a TLS handshake, reads the certificate chain and closes the connection. It reports what is expired, what expires soon and what could not be read, in a table for people and in JSON for CI and agents. It sends no application data, holds no credentials and never touches a private key.
+expirely connects to each target, completes a TLS handshake, reads the certificate chain and closes the connection. It reports what is expired, what expires soon and what could not be read, in a short list for people and in JSON for CI and agents. It sends no application data, holds no credentials and never touches a private key.
 
 ```sh
 expirely example.com api.example.com:8443   # scan targets

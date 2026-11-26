@@ -19,6 +19,7 @@ import (
 
 	"github.com/bycavii/expirely-cli/internal/probe"
 	"github.com/bycavii/expirely-cli/internal/scan"
+	"github.com/bycavii/expirely-cli/internal/ui"
 )
 
 // Exit codes returned by Run, in order of precedence when a scan has
@@ -32,12 +33,14 @@ const (
 )
 
 // Streams holds the standard streams Run reads from and writes to.
-// StdoutIsTerminal selects text output when --json is not set.
+// StdoutIsTerminal selects text output when --json is not set, and Style is
+// how stdout shows that text; the zero Style is plain.
 type Streams struct {
 	Stdin            io.Reader
 	Stdout           io.Writer
 	Stderr           io.Writer
 	StdoutIsTerminal bool
+	Style            ui.Style
 }
 
 const (
@@ -143,6 +146,7 @@ func Run(ctx context.Context, args []string, s Streams) int {
 	}
 
 	now := time.Now()
+	start := time.Now()
 	findings := scan.Scan(ctx, probe.Prober{}, targets, scan.Options{
 		Warn:        time.Duration(*warnDays) * 24 * time.Hour,
 		Timeout:     *timeout,
@@ -156,7 +160,7 @@ func Run(ctx context.Context, args []string, s Streams) int {
 			return code
 		}
 	} else {
-		writeText(s.Stdout, report)
+		writeText(s.Style.Writer(s.Stdout), s.Style, report, time.Since(start))
 	}
 	return exitCode(findings)
 }

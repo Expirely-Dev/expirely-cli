@@ -14,7 +14,7 @@ description: Scan your first targets and read the result in a minute.
     expirely example.com
     ```
 
-    Each row is one target. `STATUS` is `ok`, `expiring`, `expired` or `error`; `DAYS` counts whole days until the first certificate in the chain expires; `TRUSTED` says whether the chain verifies against the system roots.
+    Each line is one target: its status (`ok`, `expiring`, `expired` or `failed`), the whole days left until the first certificate in the chain expires, the date it expires and, when the chain is not trusted, why, such as `self-signed` or `wrong name`. A target that could not be read shows the reason instead, such as `connection refused`.
   </Step>
   <Step title="Scan a list">
     Put one target per line in a file; blank lines and lines starting with `#` are skipped:
