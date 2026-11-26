@@ -333,3 +333,12 @@ func TestReadmeListsEveryCode(t *testing.T) {
 		}
 	}
 }
+
+func TestVersionPrefersBuildVersion(t *testing.T) {
+	t.Cleanup(func() { buildVersion = "" })
+	buildVersion = "v1.2.3"
+
+	if got := version(); got != "v1.2.3" {
+		t.Errorf("version() = %q, want the ldflags value v1.2.3", got)
+	}
+}

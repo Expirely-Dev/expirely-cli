@@ -161,7 +161,14 @@ func printVersion(s Streams, jsonOut bool) int {
 	return ExitOK
 }
 
+// buildVersion is set by the release build with -ldflags -X; it is empty in
+// go build and go install builds, which report the module version instead.
+var buildVersion string
+
 func version() string {
+	if buildVersion != "" {
+		return buildVersion
+	}
 	info, ok := debug.ReadBuildInfo()
 	if !ok || info.Main.Version == "" {
 		return "(devel)"

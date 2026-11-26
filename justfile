@@ -1,5 +1,6 @@
 golangci := "go tool -modfile=tools/golangci-lint/go.mod golangci-lint"
 govulncheck := "go tool -modfile=tools/govulncheck/go.mod govulncheck"
+goreleaser := "go tool -modfile=tools/goreleaser/go.mod goreleaser"
 
 default:
     @just --list
@@ -29,9 +30,18 @@ check:
     go build ./...
     go mod tidy -diff
     for dir in tools/*/; do (cd "$dir" && go mod tidy -diff) || exit 1; done
+    {{goreleaser}} check
 
 # Run the checks CI runs: every offline check plus the vulnerability scan.
 check-ci: check vuln
+
+# Validate the release configuration.
+release-check:
+    {{goreleaser}} check
+
+# Build every release archive into ./dist without publishing.
+snapshot:
+    {{goreleaser}} release --snapshot --clean
 
 # Build the binary into ./bin.
 build:

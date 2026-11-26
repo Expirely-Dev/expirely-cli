@@ -16,12 +16,22 @@ self-signed.badssl.com:443  ok       727      2028-11-23 21:00 UTC  no       iss
 
 `expirely` connects to each target, completes a TLS handshake, reads the certificate chain and closes the connection. It sends no application data and no credentials. Expired, untrusted and mismatched chains are still read and reported.
 
-## Build
+## Install
+
+Download the archive for your platform from [GitHub Releases](https://github.com/bycavii/expirely-cli/releases), check it against `checksums.txt`, and put `expirely` on your `PATH`:
 
 ```sh
-just build
-./bin/expirely --help
+shasum -a 256 -c checksums.txt --ignore-missing
+tar -xzf expirely_*_darwin_arm64.tar.gz expirely
 ```
+
+Or build it with Go:
+
+```sh
+go install github.com/bycavii/expirely-cli/cmd/expirely@latest
+```
+
+Release archives exist for Linux, macOS and Windows on amd64 and arm64.
 
 ## Usage
 
@@ -105,7 +115,13 @@ just fmt
 just check      # offline: gofmt, vet, golangci-lint, race tests, build, tidy
 just check-ci   # what CI runs: check plus govulncheck
 just fuzz       # fuzz the target parser for 60s (just fuzz 5m for longer)
+just build      # build ./bin/expirely
+just snapshot   # build every release archive into ./dist without publishing
 ```
+
+## Release
+
+Pushing a tag `vX.Y.Z` runs `.github/workflows/release.yml`: it runs `just check-ci`, then GoReleaser builds the archives and `checksums.txt` and creates a draft GitHub release. A maintainer reviews the draft and publishes it.
 
 The repository rules for people and coding agents are in [AGENTS.md](AGENTS.md).
 
