@@ -19,7 +19,7 @@ When a scan has several outcomes, 1 wins over 3.
 Scripts and agents match on `code`; a code is never renamed or reused. A command error is one JSON line on stderr when output is JSON:
 
 ```json
-{"error":{"code":"invalid_flag","message":"flag provided but not defined: -nope"}}
+{"error":{"code":"invalid_flag","message":"unknown flag --nope"}}
 ```
 
 | Code | Exit | Meaning |

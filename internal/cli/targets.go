@@ -83,3 +83,14 @@ func readTargetFile(name string, stdin io.Reader, add func(input, where string) 
 	}
 	return nil
 }
+
+func fileNames(files []string) []string {
+	names := make([]string, len(files))
+	for i, f := range files {
+		names[i] = f
+		if f == "-" {
+			names[i] = "stdin"
+		}
+	}
+	return names
+}

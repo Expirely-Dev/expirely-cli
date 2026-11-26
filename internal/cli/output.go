@@ -48,7 +48,7 @@ func fail(s Streams, jsonOut bool, e *Error) int {
 	}
 	fmt.Fprintf(s.Stderr, "expirely: %s\n", clean(e.Message))
 	if code == ExitUsage {
-		fmt.Fprintf(s.Stderr, "\n%s", usage)
+		fmt.Fprintln(s.Stderr, "Run expirely --help to see every flag.")
 	}
 	return code
 }

@@ -14,6 +14,7 @@ import (
 	"io"
 	"runtime/debug"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/bycavii/expirely-cli/internal/probe"
@@ -45,26 +46,47 @@ const (
 	defaultConcurrency = 16
 )
 
-const usage = `Usage: expirely [flags] [TARGET...]
+const tagline = "expirely tells you when the TLS certificates you serve expire."
 
-Find every TLS certificate you serve and when it expires.
+// intro is what a person sees when they run expirely with nothing to scan:
+// a few ways in rather than every flag.
+const intro = tagline + `
 
-TARGET is host, host:port, [ipv6]:port or an https:// URL; the port
-defaults to 443. Targets come from arguments and from --file, in that
-order; repeats are scanned once.
+  expirely example.com          scan one host
+  expirely -f hosts.txt         scan a list, one per line
+  expirely --help               every flag
+`
 
-Flags:
-      --concurrency N    targets scanned at once (default 16)
-  -f, --file PATH        read targets from PATH, one per line; - reads stdin;
-                         repeatable; blank lines and # comments are skipped
-  -h, --help             show this help
-      --json             print JSON; the default when stdout is not a terminal
-      --timeout DURATION time allowed per target to connect and handshake (default 10s)
-      --version          print the version
-      --warn-days N      report certificates expiring within N days (default 30)
+const usage = tagline + `
 
-Exit codes: 0 all ok, 1 a certificate is expired or expiring,
-2 usage error, 3 a target could not be read.
+Usage
+  expirely [flags] TARGET...
+  expirely [flags] -f FILE
+
+Examples
+  expirely example.com api.example.com:8443
+  expirely -f hosts.txt --warn-days 21
+  cat hosts.txt | expirely -f - --json | jq .summary
+
+Targets
+  -f, --file PATH         read targets from PATH, one per line; - reads stdin
+  A target is host, host:port, [ipv6]:port or https://host/path.
+  The port defaults to 443.
+
+Scan
+      --warn-days N       flag certificates expiring within N days (default 30)
+      --timeout DURATION  time each target has to connect and handshake (default 10s)
+      --concurrency N     targets scanned at once (default 16)
+
+Output
+      --json              print JSON; the default when stdout is not a terminal
+      --version           print the version
+  -h, --help              show this help
+
+Exit codes
+  0 all ok, 1 expired or expiring, 2 usage error, 3 a target could not be read
+
+Docs: https://github.com/bycavii/expirely-cli
 `
 
 // Run executes expirely with args, which exclude the program name, and
@@ -89,7 +111,7 @@ func Run(ctx context.Context, args []string, s Streams) int {
 			fmt.Fprint(s.Stdout, usage)
 			return ExitOK
 		}
-		return fail(s, jsonOut, failf(CodeInvalidFlag, "%v", err))
+		return fail(s, jsonOut, failf(CodeInvalidFlag, "%s", flagError(err)))
 	}
 
 	if *showVersion {
@@ -110,6 +132,13 @@ func Run(ctx context.Context, args []string, s Streams) int {
 		return fail(s, jsonOut, e)
 	}
 	if len(targets) == 0 {
+		if len(files) > 0 {
+			return fail(s, jsonOut, failf(CodeMissingArguments, "no targets in %s", strings.Join(fileNames(files), ", ")))
+		}
+		if !jsonOut {
+			fmt.Fprint(s.Stderr, intro)
+			return errorCodes[CodeMissingArguments]
+		}
 		return fail(s, jsonOut, failf(CodeMissingArguments, "no targets: pass a host, host:port or https:// URL, or --file"))
 	}
 
@@ -174,4 +203,19 @@ func version() string {
 		return "(devel)"
 	}
 	return info.Main.Version
+}
+
+// flagError rewrites the flag package's messages in the form people type
+// flags: "flag provided but not defined: -nope" becomes "unknown flag
+// --nope", and "flag needs an argument: -timeout" becomes "--timeout needs a
+// value". Other messages are kept, with their flag names given two dashes.
+func flagError(err error) string {
+	msg := err.Error()
+	if name, ok := strings.CutPrefix(msg, "flag provided but not defined: -"); ok {
+		return "unknown flag --" + strings.TrimPrefix(name, "-")
+	}
+	if name, ok := strings.CutPrefix(msg, "flag needs an argument: -"); ok {
+		return "--" + strings.TrimPrefix(name, "-") + " needs a value"
+	}
+	return strings.Replace(msg, " flag -", " flag --", 1)
 }

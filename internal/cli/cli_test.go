@@ -38,15 +38,15 @@ func TestRunText(t *testing.T) {
 		wantStderr string
 	}{
 		{
-			name:       "no targets prints usage to stderr",
+			name:       "no targets shows a short intro, not the whole help",
 			wantCode:   ExitUsage,
-			wantStderr: "expirely: no targets: pass a host, host:port or https:// URL, or --file\n\nUsage: expirely",
+			wantStderr: intro,
 		},
 		{
 			name:       "help prints usage to stdout",
 			args:       []string{"--help"},
 			wantCode:   ExitOK,
-			wantStdout: "Usage: expirely",
+			wantStdout: usage,
 		},
 		{
 			name:       "version prints the build version",
@@ -58,7 +58,7 @@ func TestRunText(t *testing.T) {
 			name:       "unknown flag is a usage error",
 			args:       []string{"--nope"},
 			wantCode:   ExitUsage,
-			wantStderr: "expirely: flag provided but not defined: -nope\n\nUsage: expirely",
+			wantStderr: "expirely: unknown flag --nope\nRun expirely --help to see every flag.\n",
 		},
 		{
 			name:       "invalid target is a usage error",
@@ -352,6 +352,24 @@ func TestDocsListEveryFlag(t *testing.T) {
 		row := regexp.MustCompile("(?m)^\\|[^|\\n]*`" + regexp.QuoteMeta(f) + "[ `]")
 		if !row.Match(doc) {
 			t.Errorf("docs/cli/expirely.mdx has no table row for %s from the usage text", f)
+		}
+	}
+}
+
+func TestFlagError(t *testing.T) {
+	tests := []struct {
+		args []string
+		want string
+	}{
+		{[]string{"--nope"}, "unknown flag --nope"},
+		{[]string{"-nope"}, "unknown flag --nope"},
+		{[]string{"--warn-days", "x"}, `invalid value "x" for flag --warn-days: parse error`},
+		{[]string{"--timeout"}, "--timeout needs a value"},
+	}
+	for _, tt := range tests {
+		_, _, stderr := run(t, true, tt.args...)
+		if !strings.HasPrefix(stderr, "expirely: "+tt.want+"\n") {
+			t.Errorf("args %q: stderr = %q, want message %q", tt.args, stderr, tt.want)
 		}
 	}
 }
