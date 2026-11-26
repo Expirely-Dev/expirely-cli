@@ -16,6 +16,10 @@ builds:
       - -s -w -X github.com/bycavii/expirely-cli/internal/cli.buildVersion=v{{ .Version }}
     mod_timestamp: "{{ .CommitTimestamp }}"
 
+before:
+  hooks:
+    - just third-party-licenses .third-party
+
 archives:
   - formats: [tar.gz]
     format_overrides:
@@ -25,6 +29,8 @@ archives:
     files:
       - LICENSE
       - README.md
+      - src: .third-party
+        dst: third-party
 
 checksum:
   name_template: checksums.txt

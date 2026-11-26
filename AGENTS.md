@@ -16,7 +16,7 @@ Rules for agents working in this repository. User documentation is the Mintlify 
 - Text for a person goes through `internal/ui`: a layout is written once as plain text and styling only wraps words, so a styled render without its escape codes equals the plain render (`TestWriteTextStyledIsPlainPlusEscapes`), and text from certificates or peers passes through `ui.Clean`. The text output's golden file is `internal/cli/testdata/text.golden`; regenerate it with `go test ./internal/cli -run TestWriteTextGolden -update` and read the diff.
 - The tool reads certificates and nothing else: it never writes to a target, never sends credentials, and never handles private keys.
 - Tests stay offline: they use local TLS listeners with certificates generated in the test, never the internet.
-- The standard library comes first. A new module is pinned to an exact version with `go.sum` committed; each developer tool is pinned in its own `tools/<tool>/go.mod` and runs through the `justfile`.
+- The standard library comes first. A new module is pinned to an exact version with `go.sum` committed; each developer tool is pinned in its own `tools/<tool>/go.mod` and runs through the `justfile`. A module the binary links is under Apache-2.0, BSD, ISC or MIT with its license file; `just licenses-check`, part of `just check`, enforces it, and `just third-party-licenses` collects the files each release archive ships under `third-party/`.
 
 ## Before handing a change back
 

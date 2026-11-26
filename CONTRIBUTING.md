@@ -27,4 +27,4 @@ Titles follow Conventional Commits: `<type>(<scope>): <summary>`, imperative, lo
 
 ## Release
 
-A release starts with a section for its version in `CHANGELOG.md`, with breaking changes under **Breaking**. Pushing a tag `vX.Y.Z` then runs `.github/workflows/release.yml`: it runs `just check-ci`, then GoReleaser builds the archives and `checksums.txt` and opens a draft GitHub release, which a maintainer reviews and publishes. `just snapshot` builds the same archives into `./dist` without publishing.
+A release starts with a section for its version in `CHANGELOG.md`, with breaking changes under **Breaking**. Pushing a tag `vX.Y.Z` then runs `.github/workflows/release.yml`: it runs `just check-ci`, then GoReleaser collects the license, notice and patent files of Go and of every linked module with `just third-party-licenses`, builds the archives with them under `third-party/`, and builds `checksums.txt` and opens a draft GitHub release, which a maintainer reviews and publishes. `just snapshot` builds the same archives into `./dist` without publishing.

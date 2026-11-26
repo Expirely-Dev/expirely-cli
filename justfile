@@ -2,6 +2,7 @@ golangci := "go tool -modfile=tools/golangci-lint/go.mod golangci-lint"
 govulncheck := "go tool -modfile=tools/govulncheck/go.mod govulncheck"
 goreleaser := "go tool -modfile=tools/goreleaser/go.mod goreleaser"
 mint := "npx --yes mint@4.3.96"
+release_platforms := "linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64"
 
 default:
     @just --list
@@ -32,9 +33,53 @@ check:
     go mod tidy -diff
     for dir in tools/*/; do (cd "$dir" && go mod tidy -diff) || exit 1; done
     {{goreleaser}} check
+    just licenses-check
 
 # Run the checks CI runs: every offline check plus the vulnerability scan.
 check-ci: check vuln
+
+# copy the license, notice and patent files of Go and of each module a release binary links into <dir>/<module>@<version>, which GoReleaser packs under third-party/; fails on a module without a license file or with one outside Apache-2.0, BSD, ISC and MIT
+third-party-licenses dir:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    dir="{{dir}}"
+    rm -rf "$dir"
+    mkdir -p "$dir/go"
+    goroot="$(go env GOROOT)"
+    for f in LICENSE PATENTS; do
+      if [[ -f "$goroot/$f" ]]; then cp "$goroot/$f" "$dir/go/"; elif [[ -f "$goroot/../$f" ]]; then cp "$goroot/../$f" "$dir/go/"; else echo "the Go toolchain at $goroot has no $f" >&2; exit 1; fi
+    done
+    modules="$(for p in {{ release_platforms }}; do GOOS="${p%/*}" GOARCH="${p#*/}" go list -deps -f '{{{{with .Module}}{{{{if not .Main}}{{{{.Path}}@{{{{.Version}} {{{{.Dir}}{{{{end}}{{{{end}}' ./cmd/expirely; done | sort -u)"
+    failed=0
+    while read -r module src; do
+      [[ -n "$module" ]] || continue
+      licenses=0
+      for file in "$src"/*; do
+        name="$(basename "$file")"
+        shopt -s nocasematch
+        if [[ "$name" =~ ^(LICEN[CS]E|COPYING)(\.(txt|md))?$ ]]; then
+          shopt -u nocasematch
+          licenses=$((licenses + 1))
+          if grep -qiE 'GNU (Affero |Lesser )?General Public|Mozilla Public License|Server Side Public|Business Source License|Commons Clause' "$file"; then
+            echo "$module: $name is a license outside Apache-2.0, BSD, ISC and MIT" >&2; failed=1
+          elif ! { grep -q 'Apache License' "$file" && grep -q 'Version 2.0' "$file"; } && ! grep -qE 'Permission is hereby granted, free of charge|Redistribution and use in source and binary forms|Permission to use, copy, modify, and(/or)? distribute this software' "$file"; then
+            echo "$module: $name is not Apache-2.0, BSD, ISC or MIT; review it before adding the dependency" >&2; failed=1
+          fi
+        elif [[ ! "$name" =~ ^(NOTICE|PATENTS)(\.(txt|md))?$ ]]; then
+          shopt -u nocasematch
+          continue
+        fi
+        shopt -u nocasematch
+        mkdir -p "$dir/$module"
+        cp "$file" "$dir/$module/"
+      done
+      if [[ "$licenses" -eq 0 ]]; then echo "$module has no license file" >&2; failed=1; fi
+    done <<< "$modules"
+    exit "$failed"
+
+# the license files of every module a release binary links are present and allowed
+licenses-check:
+    tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT; just third-party-licenses "$tmp/third-party"
 
 # Validate the release configuration.
 release-check:
