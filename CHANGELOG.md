@@ -6,7 +6,7 @@ Every release of expirely, newest first. Until 1.0, a release can change flags, 
 
 ### Added
 
-- `expirely aws` lists every certificate in AWS Certificate Manager for one account and region, of every key type, with its status, days left and whether ACM renews it: imported certificates, which ACM never renews, say so and name how many resources use them. It reads with `acm:ListCertificates` and `acm:DescribeCertificate` only. New codes: `aws_not_configured`, `aws_access_denied`, `aws_request_failed`.
+- `expirely aws` lists every certificate in AWS Certificate Manager for one account and region, of every key type, with its status, days left and whether ACM renews it: a certificate ACM does not renew, imported or no longer eligible, names how many resources use it, and those in use come first. It reads with `acm:ListCertificates` and `acm:DescribeCertificate` only. New codes: `aws_not_configured`, `aws_access_denied`, `aws_request_failed`.
 
 ## v0.2.0 - 2026-11-26
 

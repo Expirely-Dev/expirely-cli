@@ -46,9 +46,11 @@ func sampleACM() fakeACM {
 			cert("arn:1", "*.example.com", types.CertificateTypeAmazonIssued, types.RenewalEligibilityEligible, at(61)),
 			cert("arn:2", "api.example.com", types.CertificateTypeImported, types.RenewalEligibilityIneligible, at(12)),
 			cert("arn:3", "legacy.example.internal", types.CertificateTypeImported, types.RenewalEligibilityIneligible, at(203)),
+			cert("arn:5", "old.example.com", types.CertificateTypeAmazonIssued, types.RenewalEligibilityIneligible, at(-900)),
+			cert("arn:6", "api.example.org", types.CertificateTypeAmazonIssued, types.RenewalEligibilityIneligible, at(-770)),
 			{CertificateArn: aws.String("arn:4"), DomainName: aws.String("pending.example.com"), Type: types.CertificateTypeAmazonIssued, Status: types.CertificateStatusPendingValidation},
 		},
-		inUseBy: map[string][]string{"arn:2": {"lb-a", "lb-b"}},
+		inUseBy: map[string][]string{"arn:2": {"lb-a", "lb-b"}, "arn:6": {"lb-c", "lb-d", "cf-e"}},
 	}
 }
 
@@ -84,16 +86,18 @@ func TestAWSText(t *testing.T) {
 	}
 	lines := strings.Split(stdout, "\n")
 	want := []string{
-		"  expiring  api.example.com          12 days   ",
-		"  ok        *.example.com            61 days   ",
-		"  ok        legacy.example.internal  203 days  ",
+		"  expired   api.example.org          770 days ago  ",
+		"  expired   old.example.com          900 days ago  ",
+		"  expiring  api.example.com          12 days       ",
+		"  ok        *.example.com            61 days       ",
+		"  ok        legacy.example.internal  203 days      ",
 	}
 	for i, prefix := range want {
 		if !strings.HasPrefix(lines[i+1], prefix) {
 			t.Errorf("line %d = %q, want prefix %q", i+1, lines[i+1], prefix)
 		}
 	}
-	for _, note := range []string{"imported, in use by 2 resources", "renews itself", "imported, not in use"} {
+	for _, note := range []string{"imported, in use by 2 resources", "renews itself", "imported, not in use", "does not renew, in use by 3 resources", "does not renew, not in use"} {
 		if !strings.Contains(stdout, note) {
 			t.Errorf("stdout = %q, want the note %q", stdout, note)
 		}
@@ -115,8 +119,8 @@ func TestAWSJSON(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout), &got); err != nil {
 		t.Fatalf("stdout is not the JSON report: %v\n%s", err, stdout)
 	}
-	if len(got.Results) != 3 {
-		t.Fatalf("len(results) = %d, want 3", len(got.Results))
+	if len(got.Results) != 5 {
+		t.Fatalf("len(results) = %d, want 5; the certificate never issued is left out", len(got.Results))
 	}
 	var info struct {
 		ARN      string   `json:"arn"`

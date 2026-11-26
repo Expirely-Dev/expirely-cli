@@ -22,7 +22,7 @@ expirely aws --json | jq '.results[] | select(.acm.imported and .status != "ok")
 
 ## Imported certificates
 
-ACM renews the certificates it issues. It never renews a certificate that was imported into it, and those are the ones that expire without warning. Each line says which kind it is:
+ACM renews the certificates it issues while they are eligible. It never renews a certificate that was imported into it, and those are the ones that expire without warning. Each line says whether ACM renews the certificate and, when it does not, how many resources use it:
 
 ```
   expiring  api.example.com          12 days   Dec 08 2026  imported, in use by 2 resources
@@ -30,10 +30,12 @@ ACM renews the certificates it issues. It never renews a certificate that was im
   ok        legacy.example.internal  203 days  Jun 17 2027  imported, not in use
 ```
 
-- `imported, in use by N resources`: ACM will not renew it, and a load balancer, CloudFront distribution or API stage serves it.
-- `imported, not in use`: ACM will not renew it, and nothing serves it.
 - `renews itself`: ACM issued it and will renew it.
-- `does not renew`: ACM issued it but reports it is not eligible for renewal.
+- `imported, in use by N resources`: ACM will not renew it, and a load balancer, CloudFront distribution or API stage serves it.
+- `does not renew, in use by N resources`: ACM issued it but reports it is not eligible for renewal, and something still serves it.
+- `imported, not in use` or `does not renew, not in use`: nothing serves it, so its expiry breaks nothing; it can be deleted.
+
+Notes about a certificate in use are highlighted, and within the same status a certificate in use is listed before one that nothing uses: an expired certificate still in use is a likely outage, while an expired one nothing uses is clean-up.
 
 A certificate that was never issued, such as one pending validation, has no end date and is left out.
 

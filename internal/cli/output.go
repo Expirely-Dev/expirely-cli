@@ -125,6 +125,9 @@ func writeText(w io.Writer, st ui.Style, r report, elapsed time.Duration) {
 		if c := cmp.Compare(urgency[a.Status], urgency[b.Status]); c != 0 {
 			return c
 		}
+		if c := cmp.Compare(inUse(a), inUse(b)); c != 0 {
+			return c
+		}
 		return cmp.Compare(days(a), days(b))
 	})
 
@@ -273,19 +276,36 @@ func note(f scan.Finding) (text string, warn bool) {
 	return trustWords[*f.TrustIssue], true
 }
 
+// acmNote says whether ACM renews a certificate and, when it does not, how
+// many resources use it: a certificate nothing uses can only be cleaned up,
+// while one in use is what breaks when it expires, so only that one warns.
 func acmNote(a *scan.ACMInfo) (string, bool) {
+	var renewal string
 	switch {
-	case a.Imported && len(a.InUseBy) == 1:
-		return "imported, in use by 1 resource", true
-	case a.Imported && len(a.InUseBy) > 1:
-		return "imported, in use by " + strconv.Itoa(len(a.InUseBy)) + " resources", true
 	case a.Imported:
-		return "imported, not in use", true
+		renewal = "imported"
 	case a.RenewalEligibility == "ELIGIBLE":
 		return "renews itself", false
 	default:
-		return "does not renew", true
+		renewal = "does not renew"
 	}
+	switch n := len(a.InUseBy); n {
+	case 0:
+		return renewal + ", not in use", false
+	case 1:
+		return renewal + ", in use by 1 resource", true
+	default:
+		return renewal + ", in use by " + strconv.Itoa(n) + " resources", true
+	}
+}
+
+// inUse orders certificates in use before those nothing uses, within the
+// same status; a scanned target is always in use.
+func inUse(f scan.Finding) int {
+	if f.ACM != nil && len(f.ACM.InUseBy) == 0 {
+		return 1
+	}
+	return 0
 }
 
 func summary(st ui.Style, r report) string {
