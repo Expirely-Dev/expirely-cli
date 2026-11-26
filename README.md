@@ -27,3 +27,7 @@ The repository rules for people and coding agents are in [AGENTS.md](AGENTS.md).
 |---|---|
 | 0 | Success, `--help` or `--version` |
 | 2 | Usage error: unknown flag or unexpected argument |
+
+## License
+
+Apache License 2.0. See [LICENSE](LICENSE).
