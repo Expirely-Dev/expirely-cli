@@ -18,6 +18,8 @@ just fmt
 just check
 ```
 
+The repository rules for people and coding agents are in [AGENTS.md](AGENTS.md).
+
 ## Exit codes
 
 | Code | Meaning |
