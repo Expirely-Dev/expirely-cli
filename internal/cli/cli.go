@@ -35,7 +35,8 @@ const (
 // Streams holds the standard streams Run reads from and writes to.
 // StdoutIsTerminal selects text output when --json is not set, and Style is
 // how stdout shows that text; the zero Style is plain. StderrIsTerminal
-// allows a progress spinner on stderr while a scan runs.
+// allows a progress spinner on stderr while a scan runs. Getenv reads the
+// environment for agent detection; nil detects no agent.
 type Streams struct {
 	Stdin            io.Reader
 	Stdout           io.Writer
@@ -43,6 +44,7 @@ type Streams struct {
 	StdoutIsTerminal bool
 	StderrIsTerminal bool
 	Style            ui.Style
+	Getenv           func(string) string
 }
 
 const (
@@ -98,12 +100,16 @@ Docs: https://github.com/bycavii/expirely-cli
 // returns the exit code. Help goes to stdout and exits ExitOK; errors go to
 // stderr and exit with the code errorCodes assigns to them.
 func Run(ctx context.Context, args []string, s Streams) int {
-	jsonOut := !s.StdoutIsTerminal || wantsJSON(args)
+	ag := detectAgent(s.Getenv, s.StdoutIsTerminal)
+	if ag.Name != "" {
+		s.Style = ui.Style{}
+	}
+	jsonOut := !s.StdoutIsTerminal || ag.Declared || wantsJSON(args)
 
 	fs := flag.NewFlagSet("expirely", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	showVersion := fs.Bool("version", false, "")
-	fs.Bool("json", false, "")
+	jsonFlag := fs.Bool("json", false, "")
 	warnDays := fs.Int("warn-days", defaultWarnDays, "")
 	timeout := fs.Duration("timeout", defaultTimeout, "")
 	concurrency := fs.Int("concurrency", defaultConcurrency, "")
@@ -118,6 +124,12 @@ func Run(ctx context.Context, args []string, s Streams) int {
 		}
 		return fail(s, jsonOut, failf(CodeInvalidFlag, "%s", flagError(err)))
 	}
+
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == "json" {
+			jsonOut = *jsonFlag
+		}
+	})
 
 	if *showVersion {
 		return printVersion(s, jsonOut)
@@ -156,7 +168,7 @@ func Run(ctx context.Context, args []string, s Streams) int {
 		Concurrency: *concurrency,
 	}
 	var spinner *ui.Spinner
-	if s.StderrIsTerminal {
+	if s.StderrIsTerminal && ag.Name == "" {
 		spinner = ui.StartSpinner(s.Stderr, len(targets))
 		opts.Progress = spinner.Done
 	}

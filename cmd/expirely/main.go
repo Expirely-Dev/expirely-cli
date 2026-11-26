@@ -20,6 +20,7 @@ func main() {
 		StdoutIsTerminal: isTerminal(os.Stdout),
 		StderrIsTerminal: isTerminal(os.Stderr) && os.Getenv("TERM") != "dumb",
 		Style:            ui.Style{Profile: colorprofile.Detect(os.Stdout, os.Environ())},
+		Getenv:           os.Getenv,
 	})
 	stop()
 	os.Exit(code)

@@ -57,6 +57,15 @@ The text output has one line per target, most urgent first, then the counts and 
 
 Text taken from certificates and errors has its control characters removed before it reaches a terminal.
 
+## Environment
+
+| Variable         | Effect                                                                                     |
+| ---------------- | ------------------------------------------------------------------------------------------ |
+| `NO_COLOR`       | Text without color                                                                         |
+| `TERM=dumb`      | Text without color and no spinner                                                          |
+| `EXPIRELY_AGENT` | `1` makes expirely behave as run by an agent; `0` turns agent detection off                |
+| `AI_AGENT`, `AGENT` and agent markers | Detected AI agents get no color and no spinner; declared ones get JSON. See [AI agents and CI](/agents) |
+
 ## Exit codes
 
 `0` when every target is `ok`, `1` when a certificate is `expired` or `expiring`, `2` for a usage error and `3` when a target could not be read. `1` wins over `3`. Each code is in [Error codes](/reference/error-codes).

@@ -19,6 +19,21 @@ expirely -f targets.txt | jq '.summary'
 
 Every field is described in [Output](/reference/output). A value that could not be read is `null`, never zero or a default date.
 
+## Agents on a terminal
+
+Some agents run commands under a pseudo-terminal, where expirely would otherwise draw a spinner and color. expirely reads the environment, stops at the first match, and adapts:
+
+| Variable                                                      | Agent      | What changes                    |
+| ------------------------------------------------------------- | ---------- | ------------------------------- |
+| `EXPIRELY_AGENT=1` or `true`                                  | declared   | JSON, no color, no spinner      |
+| `EXPIRELY_AGENT=0` or `false`                                 | a person   | detection is off                |
+| `AI_AGENT=<name>`, then `AGENT=<name>`                        | declared   | JSON, no color, no spinner      |
+| `CODEX_SANDBOX`, `CODEX_CI`, `CODEX_THREAD_ID`                | declared   | JSON, no color, no spinner      |
+| `GEMINI_CLI`, `CURSOR_AGENT`, `COPILOT_CLI`, `OPENCODE`, `CLAUDE_CODE_CHILD_SESSION` | detected | no color, no spinner |
+| `CLAUDECODE=1`, only when stdout is not a terminal            | detected   | no color, no spinner            |
+
+A declared agent said what it is, so it gets JSON even on a terminal. `CLAUDECODE` alone is not enough on a terminal, because IDE terminals that people type in set it too. An explicit `--json` or `--json=false` wins over all of this.
+
 ## Decide on the exit code
 
 | Exit | What to do                                                    |
