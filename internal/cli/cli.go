@@ -84,6 +84,7 @@ Scan
       --warn-days N       flag certificates expiring within N days (default 30)
       --timeout DURATION  time each target has to connect and handshake (default 10s)
       --concurrency N     targets scanned at once (default 16)
+      --ca-file PATH      also trust the CA certificates in this PEM file
 
 Output
       --json              print JSON; the default when stdout is not a terminal
@@ -116,7 +117,8 @@ func Run(ctx context.Context, args []string, s Streams) int {
 	timeout := fs.Duration("timeout", defaultTimeout, "")
 	concurrency := fs.Int("concurrency", defaultConcurrency, "")
 	details := fs.Bool("details", false, "")
-	var files fileList
+	var files, caFiles fileList
+	fs.Var(&caFiles, "ca-file", "")
 	fs.Var(&files, "file", "")
 	fs.Var(&files, "f", "")
 
@@ -147,6 +149,11 @@ func Run(ctx context.Context, args []string, s Streams) int {
 		return fail(s, out(), failf(CodeInvalidFlag, "--concurrency must be 1 or more, got %d", *concurrency))
 	}
 
+	roots, e := loadRoots(caFiles)
+	if e != nil {
+		return fail(s, out(), e)
+	}
+
 	targets, e := collectTargets(fs.Args(), files, s.Stdin)
 	if e != nil {
 		return fail(s, out(), e)
@@ -175,7 +182,7 @@ func Run(ctx context.Context, args []string, s Streams) int {
 		spinner = ui.StartSpinner(s.Stderr, len(targets))
 		opts.Progress = spinner.Done
 	}
-	findings := scan.Scan(ctx, probe.Prober{}, targets, opts)
+	findings := scan.Scan(ctx, probe.Prober{Roots: roots}, targets, opts)
 	if spinner != nil {
 		spinner.Stop()
 	}

@@ -61,6 +61,7 @@ func TestTrustIssue(t *testing.T) {
 	}{
 		{"name mismatch", x509.HostnameError{Certificate: leaf, Host: "other.example"}, TrustNameMismatch},
 		{"unknown authority", x509.UnknownAuthorityError{Cert: leaf}, TrustUnknownAuthority},
+		{"macos system verifier", errors.New("x509: \u201clocalhost\u201d certificate is not trusted"), TrustUnknownAuthority},
 		{"expired", x509.CertificateInvalidError{Cert: leaf, Reason: x509.Expired}, TrustExpired},
 		{"other", x509.CertificateInvalidError{Cert: leaf, Reason: x509.NotAuthorizedToSign}, TrustInvalid},
 	}

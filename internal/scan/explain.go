@@ -27,6 +27,9 @@ const (
 // trustIssue names the reason verifyErr gives for chain not verifying. A
 // leaf that signed itself is TrustSelfSigned rather than
 // TrustUnknownAuthority; a reason with no name of its own is TrustInvalid.
+// On macOS, Go verifies with the system and reports a root it does not know
+// as an untyped "certificate is not trusted" error, which is read as
+// TrustUnknownAuthority too.
 func trustIssue(verifyErr error, leaf *x509.Certificate) string {
 	var hostErr x509.HostnameError
 	var authErr x509.UnknownAuthorityError
@@ -34,7 +37,7 @@ func trustIssue(verifyErr error, leaf *x509.Certificate) string {
 	switch {
 	case errors.As(verifyErr, &hostErr):
 		return TrustNameMismatch
-	case errors.As(verifyErr, &authErr):
+	case errors.As(verifyErr, &authErr), strings.HasSuffix(verifyErr.Error(), "certificate is not trusted"):
 		if selfSigned(leaf) {
 			return TrustSelfSigned
 		}

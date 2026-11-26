@@ -2,6 +2,16 @@
 
 Every release of expirely, newest first. Until 1.0, a release can change flags, JSON fields and codes; each change that does is under **Breaking**, with what to do.
 
+## Unreleased
+
+### Added
+
+- `--ca-file PATH` trusts the CA certificates in a PEM file on top of the system roots, so chains from an internal CA are `trusted`. A file that cannot be read or holds no certificate fails with `invalid_ca_file`.
+
+### Fixed
+
+- On macOS, a chain whose root the system does not know is reported as `unknown_authority` (`untrusted issuer` in text) instead of `invalid` (`not trusted`).
+
 ## v0.1.0 - 2026-11-26
 
 The first release.

@@ -49,6 +49,16 @@ printf 'example.com\napi.example.com:8443\n' | expirely -f -
 
 Targets from arguments come first, then each file in the order given. A target that appears twice is scanned once, at its first position. JSON output keeps this order; the text output lists the most urgent targets first.
 
+## Internal certificate authorities
+
+A certificate issued by an internal CA shows as `untrusted issuer`, because expirely checks chains against the system roots. Give it the CA's root, in PEM, to check those chains too:
+
+```sh
+expirely --ca-file internal-root.pem -f internal-hosts.txt
+```
+
+The CAs in the file are added to the system roots, so public hosts in the same scan stay trusted. `--ca-file` can be given more than once.
+
 ## Many targets
 
 expirely scans 16 targets at once and gives each 10 seconds to connect and complete the handshake. Raise `--concurrency` for long lists and lower `--timeout` where a slow target is already a problem:

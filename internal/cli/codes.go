@@ -10,6 +10,7 @@ const (
 	CodeInvalidTarget    = "invalid_target"
 	CodeMissingArguments = "missing_arguments"
 	CodeFileUnreadable   = "file_unreadable"
+	CodeInvalidCAFile    = "invalid_ca_file"
 	CodeOutputFailed     = "output_failed"
 )
 
@@ -21,6 +22,7 @@ var remediations = map[string]string{
 	CodeInvalidTarget:    "A target is host, host:port, [ipv6]:port or https://host/path; the port defaults to 443.",
 	CodeMissingArguments: "Targets come as arguments, such as expirely example.com, or one per line from --file.",
 	CodeFileUnreadable:   "A --file needs to exist, be readable and hold one target per line of at most 64 KiB; - reads stdin.",
+	CodeInvalidCAFile:    "A --ca-file is a readable PEM file with one or more CERTIFICATE blocks, such as an internal CA's root.",
 	CodeOutputFailed:     "The reader of stdout closed before the output ended, as a pipe to head does; the scan itself finished.",
 }
 
@@ -30,6 +32,7 @@ var errorCodes = map[string]int{
 	CodeInvalidTarget:    ExitUsage,
 	CodeMissingArguments: ExitUsage,
 	CodeFileUnreadable:   ExitUsage,
+	CodeInvalidCAFile:    ExitUsage,
 	CodeOutputFailed:     ExitFailure,
 }
 
