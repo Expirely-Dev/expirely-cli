@@ -76,6 +76,27 @@ func (ca CA) Leaf(t testing.TB, dnsName string, notAfter time.Time) tls.Certific
 	return tls.Certificate{Certificate: [][]byte{der}, PrivateKey: key}
 }
 
+// SelfSigned creates a certificate for dnsName that signs itself, valid from
+// an hour ago until notAfter.
+func SelfSigned(t testing.TB, dnsName string, notAfter time.Time) tls.Certificate {
+	t.Helper()
+	key := newKey(t)
+	tmpl := &x509.Certificate{
+		SerialNumber: big.NewInt(3),
+		Subject:      pkix.Name{CommonName: dnsName},
+		DNSNames:     []string{dnsName},
+		NotBefore:    time.Now().Add(-time.Hour),
+		NotAfter:     notAfter,
+		KeyUsage:     x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+	}
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return tls.Certificate{Certificate: [][]byte{der}, PrivateKey: key}
+}
+
 // Serve accepts connections on 127.0.0.1 and runs handle on each until the
 // test ends, then waits for every handler to return. It returns the port.
 func Serve(t testing.TB, handle func(net.Conn)) int {

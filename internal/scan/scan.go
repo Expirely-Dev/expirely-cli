@@ -41,9 +41,11 @@ type Cert struct {
 	DNSNames  []string  `json:"dns_names"`
 }
 
-// FindingError is why a target could not be read.
+// FindingError is why a target could not be read. Reason says it in a few
+// words for a person; Message is the full error.
 type FindingError struct {
 	Code    string `json:"code"`
+	Reason  string `json:"reason"`
 	Message string `json:"message"`
 }
 
@@ -57,8 +59,11 @@ type Finding struct {
 	DaysLeft *int `json:"days_left"`
 	// ExpiresAt is when the first certificate in the chain expires, which
 	// may be an intermediate rather than the leaf.
-	ExpiresAt   *time.Time    `json:"expires_at"`
-	Trusted     *bool         `json:"trusted"`
+	ExpiresAt *time.Time `json:"expires_at"`
+	Trusted   *bool      `json:"trusted"`
+	// TrustIssue names why the chain does not verify, one of the Trust
+	// constants; it is nil when the chain verifies or on error.
+	TrustIssue  *string       `json:"trust_issue"`
 	VerifyError *string       `json:"verify_error"`
 	Leaf        *Cert         `json:"leaf"`
 	Chain       []Cert        `json:"chain"`
@@ -143,10 +148,12 @@ func Classify(r probe.Result, now time.Time, warn time.Duration) Finding {
 	days := daysLeft(left)
 	expires := earliest.UTC()
 	trusted := r.VerifyError == nil
-	var verifyErr *string
+	var verifyErr, issue *string
 	if r.VerifyError != nil {
 		msg := r.VerifyError.Error()
 		verifyErr = &msg
+		name := trustIssue(r.VerifyError, r.Chain[0])
+		issue = &name
 	}
 	leaf := chain[0]
 	return Finding{
@@ -155,6 +162,7 @@ func Classify(r probe.Result, now time.Time, warn time.Duration) Finding {
 		DaysLeft:    &days,
 		ExpiresAt:   &expires,
 		Trusted:     &trusted,
+		TrustIssue:  issue,
 		VerifyError: verifyErr,
 		Leaf:        &leaf,
 		Chain:       chain,
@@ -178,6 +186,6 @@ func errorFinding(t target.Target, err error) Finding {
 	return Finding{
 		Target: t.String(),
 		Status: StatusError,
-		Error:  &FindingError{Code: code, Message: err.Error()},
+		Error:  &FindingError{Code: code, Reason: reason(err), Message: err.Error()},
 	}
 }

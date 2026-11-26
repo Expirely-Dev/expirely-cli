@@ -17,6 +17,7 @@ expirely prints this report when `--json` is set or stdout is not a terminal. Th
       "days_left": -4246,
       "expires_at": "2015-04-12T23:59:59Z",
       "trusted": false,
+      "trust_issue": "expired",
       "verify_error": "x509: certificate has expired or is not yet valid: “*.badssl.com” certificate is expired",
       "leaf": {
         "subject": "CN=*.badssl.com,OU=Domain Control Validated+OU=PositiveSSL Wildcard",
@@ -53,10 +54,25 @@ A field that could not be read is `null`, never zero or a default date.
 | `days_left` | Whole days until `expires_at`, negative once expired; `null` on error |
 | `expires_at` | The earliest `NotAfter` in the chain; `null` on error |
 | `trusted` | Whether the chain verifies for the host against the system roots; `null` on error |
-| `verify_error` | Why the chain does not verify; `null` when it does or on error |
+| `trust_issue` | Why the chain does not verify, as one of the values below; `null` when it does or on error |
+| `verify_error` | The full verification error; `null` when the chain verifies or on error |
 | `leaf` | The leaf certificate; `null` on error |
 | `chain` | Every certificate the server sent, leaf first; `null` on error |
-| `error` | `{"code","message"}` when the target could not be read; `null` otherwise |
+| `error` | `{"code","reason","message"}` when the target could not be read; `null` otherwise |
+
+## Trust issues
+
+| Value | Meaning |
+|---|---|
+| `expired` | A certificate in the chain is outside its validity period |
+| `self_signed` | The leaf certificate signed itself |
+| `unknown_authority` | The chain does not lead to a root the system trusts |
+| `name_mismatch` | The certificate is not valid for the host that was scanned |
+| `invalid` | Another verification failure; `verify_error` has the detail |
+
+## Errors of a result
+
+`error.code` is `dial_failed` or `handshake_failed`, listed in [Error codes](/reference/error-codes). `error.reason` says why in a few words, such as `connection refused`, `no such host`, `timed out`, `not a TLS server` or `no certificate sent`; it is for people and can change. `error.message` is the full error.
 
 ## Certificate
 

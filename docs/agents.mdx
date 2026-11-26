@@ -32,13 +32,13 @@ When a scan has both, `1` wins over `3`.
 
 ## Match on codes, not messages
 
-A command error is one JSON line on stderr, and a target that could not be read carries the same shape in its `error` field:
+A command error is one JSON line on stderr. A target that could not be read carries a `code` in its `error` field too, and a chain that does not verify names why in `trust_issue`:
 
 ```json
 {"error":{"code":"invalid_target","message":"invalid target \"http://example.com\": scheme \"http\" does not use TLS; use https://"}}
 ```
 
-Messages are for people and can change. Codes are never renamed or reused; they are listed in [Error codes](/reference/error-codes).
+Messages and reasons are for people and can change. Codes and `trust_issue` values are never renamed or reused; they are listed in [Error codes](/reference/error-codes) and [Output](/reference/output).
 
 ## Safe to run
 
