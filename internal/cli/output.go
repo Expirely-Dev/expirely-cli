@@ -140,7 +140,8 @@ func writeText(w io.Writer, st ui.Style, r report, elapsed time.Duration) {
 	var b strings.Builder
 	b.WriteString("\n")
 	for i, f := range rows {
-		texts := []string{cells[i][0], cells[i][1], cells[i][2], cells[i][3], note(f)}
+		noteText, noteWarns := note(f)
+		texts := []string{cells[i][0], cells[i][1], cells[i][2], cells[i][3], noteText}
 		last := len(texts) - 1
 		for last > 0 && texts[last] == "" {
 			last--
@@ -152,7 +153,7 @@ func writeText(w io.Writer, st ui.Style, r report, elapsed time.Duration) {
 				text = pad(text, width[c])
 			}
 			b.WriteString(" ")
-			b.WriteString(cellStyle(st, f.Status, c, text))
+			b.WriteString(cellStyle(st, f.Status, c, text, noteWarns))
 			if c < last {
 				b.WriteString(" ")
 			}
@@ -170,7 +171,7 @@ func writeText(w io.Writer, st ui.Style, r report, elapsed time.Duration) {
 // cellStyle styles column c of a row: the status in its color, the target
 // in bold, the date faint and the trust note as a remark. Trailing padding
 // stays outside the escape codes, so stripping them gives the plain line.
-func cellStyle(st ui.Style, s scan.Status, c int, text string) string {
+func cellStyle(st ui.Style, s scan.Status, c int, text string, noteWarns bool) string {
 	word := strings.TrimRight(text, " ")
 	spaces := text[len(word):]
 	switch c {
@@ -181,7 +182,11 @@ func cellStyle(st ui.Style, s scan.Status, c int, text string) string {
 	case 3:
 		word = st.Faint(word)
 	case 4:
-		word = st.Note(word)
+		if noteWarns {
+			word = st.Note(word)
+		} else {
+			word = st.Faint(word)
+		}
 	}
 	return word + spaces
 }
@@ -255,13 +260,32 @@ func date(f scan.Finding) string {
 	return f.ExpiresAt.Format("Jan 02 2006")
 }
 
-// note names a trust problem in words. An expired chain needs no note: its
-// status already says so.
-func note(f scan.Finding) string {
-	if f.TrustIssue == nil {
-		return ""
+// note names a trust problem in words, or for an ACM certificate whether
+// it renews itself. An expired chain needs no note: its status already says
+// so. warn reports whether the note asks for attention.
+func note(f scan.Finding) (text string, warn bool) {
+	if f.ACM != nil {
+		return acmNote(f.ACM)
 	}
-	return trustWords[*f.TrustIssue]
+	if f.TrustIssue == nil {
+		return "", false
+	}
+	return trustWords[*f.TrustIssue], true
+}
+
+func acmNote(a *scan.ACMInfo) (string, bool) {
+	switch {
+	case a.Imported && len(a.InUseBy) == 1:
+		return "imported, in use by 1 resource", true
+	case a.Imported && len(a.InUseBy) > 1:
+		return "imported, in use by " + strconv.Itoa(len(a.InUseBy)) + " resources", true
+	case a.Imported:
+		return "imported, not in use", true
+	case a.RenewalEligibility == "ELIGIBLE":
+		return "renews itself", false
+	default:
+		return "does not renew", true
+	}
 }
 
 func summary(st ui.Style, r report) string {

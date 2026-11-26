@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bycavii/expirely-cli/internal/acm"
 	"github.com/bycavii/expirely-cli/internal/probe"
 	"github.com/bycavii/expirely-cli/internal/scan"
 	"github.com/bycavii/expirely-cli/internal/ui"
@@ -45,6 +46,9 @@ type Streams struct {
 	StderrIsTerminal bool
 	Style            ui.Style
 	Getenv           func(string) string
+	// NewACM builds the ACM client of expirely aws; nil builds the real
+	// one from the AWS configuration. Tests set it to a fake.
+	NewACM func(ctx context.Context, profile, region string) (acm.API, string, error)
 }
 
 const (
@@ -69,6 +73,10 @@ const usage = tagline + `
 Usage
   expirely [flags] TARGET...
   expirely [flags] -f FILE
+  expirely aws [flags]
+
+Commands
+  expirely aws            list the certificates in AWS Certificate Manager; see expirely aws --help
 
 Examples
   expirely example.com api.example.com:8443
@@ -102,6 +110,9 @@ Docs: https://github.com/bycavii/expirely-cli
 // returns the exit code. Help goes to stdout and exits ExitOK; errors go to
 // stderr and exit with the code errorCodes assigns to them.
 func Run(ctx context.Context, args []string, s Streams) int {
+	if len(args) > 0 && args[0] == "aws" {
+		return runAWS(ctx, args[1:], s)
+	}
 	ag := detectAgent(s.Getenv, s.StdoutIsTerminal)
 	if ag.Name != "" {
 		s.Style = ui.Style{}

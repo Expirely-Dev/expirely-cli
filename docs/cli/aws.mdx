@@ -1,0 +1,74 @@
+---
+title: expirely aws
+description: List the certificates in AWS Certificate Manager and when they expire.
+---
+
+`expirely aws` reads every certificate in AWS Certificate Manager for one account and region, and reports each one the way a scan reports a target: its status, the days left and the date it expires. It reads with two API calls and changes nothing.
+
+```sh
+expirely aws --profile production --region us-east-1
+AWS_PROFILE=production expirely aws --warn-days 21
+expirely aws --json | jq '.results[] | select(.acm.imported and .status != "ok")'
+```
+
+| Flag                 | Description                                                                                     |
+| -------------------- | ----------------------------------------------------------------------------------------------- |
+| `--profile NAME`     | Profile from the shared AWS config. Default `AWS_PROFILE`, or the default credential chain      |
+| `--region REGION`    | Region to read. Default `AWS_REGION`, or the profile's region                                    |
+| `--warn-days N`      | Report certificates that expire within `N` days as `expiring`, `0` or more. Default `30`        |
+| `--timeout DURATION` | Time allowed to read ACM, such as `1m`. Default `30s`                                            |
+| `--json`             | Print JSON. Also the default when stdout is not a terminal                                       |
+| `-h`, `--help`       | Print the help as text and exit `0`                                                              |
+
+## Imported certificates
+
+ACM renews the certificates it issues. It never renews a certificate that was imported into it, and those are the ones that expire without warning. Each line says which kind it is:
+
+```
+  expiring  api.example.com          12 days   Dec 08 2026  imported, in use by 2 resources
+  ok        *.example.com            61 days   Jan 26 2027  renews itself
+  ok        legacy.example.internal  203 days  Jun 17 2027  imported, not in use
+```
+
+- `imported, in use by N resources`: ACM will not renew it, and a load balancer, CloudFront distribution or API stage serves it.
+- `imported, not in use`: ACM will not renew it, and nothing serves it.
+- `renews itself`: ACM issued it and will renew it.
+- `does not renew`: ACM issued it but reports it is not eligible for renewal.
+
+A certificate that was never issued, such as one pending validation, has no end date and is left out.
+
+## Permissions
+
+`expirely aws` calls `acm:ListCertificates` and `acm:DescribeCertificate`. This policy is enough:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["acm:ListCertificates", "acm:DescribeCertificate"],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+ACM certificates are regional, and CloudFront uses those in `us-east-1`. Run `expirely aws` once per region that holds certificates.
+
+## Output
+
+The JSON report is the one in [Output](/reference/output). Each result has an `acm` object and no trust fields, since ACM does not verify the chain for a host:
+
+| Field                     | Meaning                                                              |
+| ------------------------- | -------------------------------------------------------------------- |
+| `acm.arn`                 | The certificate's ARN                                                |
+| `acm.type`                | `AMAZON_ISSUED`, `IMPORTED` or `PRIVATE`                             |
+| `acm.imported`            | `true` for a certificate ACM never renews                            |
+| `acm.status`              | ACM's status, such as `ISSUED` or `EXPIRED`                          |
+| `acm.renewal_eligibility` | `ELIGIBLE` or `INELIGIBLE`                                           |
+| `acm.in_use_by`           | ARNs of the resources that use it; empty when none do                |
+
+## Exit codes
+
+The same as a scan: `0` when every certificate is `ok`, `1` when one is `expired` or `expiring`. A missing region or profile exits `2` with `aws_not_configured`; refused credentials or missing permissions exit `3` with `aws_access_denied`, and any other AWS failure exits `3` with `aws_request_failed`. Each code is in [Error codes](/reference/error-codes).

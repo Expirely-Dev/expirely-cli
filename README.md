@@ -9,6 +9,7 @@ expirely example.com api.example.com:8443   # scan targets
 expirely -f targets.txt --warn-days 21       # read targets from a file
 kubectl get ingress -A -o jsonpath='{range .items[*].spec.tls[*].hosts[*]}{@}{"\n"}{end}' | expirely -f -
 expirely --json example.com | jq '.results[] | select(.status != "ok")'
+expirely aws --profile production --region us-east-1   # every certificate in ACM
 ```
 
 Exit code 1 means a certificate is expired or expiring, so the same command works as a CI gate or a cron alert.

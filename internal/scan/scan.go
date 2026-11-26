@@ -78,6 +78,20 @@ type Finding struct {
 	// leave it out unless asked for, since it is most of their size.
 	Chain []Cert        `json:"chain,omitempty"`
 	Error *FindingError `json:"error"`
+	// ACM describes a certificate read from AWS Certificate Manager rather
+	// than from a handshake; it is absent for scanned targets.
+	ACM *ACMInfo `json:"acm,omitempty"`
+}
+
+// ACMInfo is what ACM says about one of its certificates. Imported is true
+// for a certificate ACM never renews.
+type ACMInfo struct {
+	ARN                string   `json:"arn"`
+	Type               string   `json:"type"`
+	Imported           bool     `json:"imported"`
+	Status             string   `json:"status"`
+	RenewalEligibility string   `json:"renewal_eligibility"`
+	InUseBy            []string `json:"in_use_by"`
 }
 
 // Prober reads the certificate chain of a target.
@@ -152,16 +166,8 @@ func Classify(r probe.Result, now time.Time, warn time.Duration) Finding {
 		}
 	}
 
-	left := earliest.Sub(now)
-	status := StatusOK
-	switch {
-	case !earliest.After(now):
-		status = StatusExpired
-	case left < warn:
-		status = StatusExpiring
-	}
-
-	days := daysLeft(left)
+	status := expiryStatus(earliest, now, warn)
+	days := daysLeft(earliest.Sub(now))
 	expires := earliest.UTC()
 	trusted := r.VerifyError == nil
 	var verifyErr, issue *string
@@ -182,6 +188,17 @@ func Classify(r probe.Result, now time.Time, warn time.Duration) Finding {
 		VerifyError: verifyErr,
 		Leaf:        &leaf,
 		Chain:       chain,
+	}
+}
+
+func expiryStatus(notAfter, now time.Time, warn time.Duration) Status {
+	switch {
+	case !notAfter.After(now):
+		return StatusExpired
+	case notAfter.Sub(now) < warn:
+		return StatusExpiring
+	default:
+		return StatusOK
 	}
 }
 

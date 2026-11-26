@@ -11,6 +11,9 @@ const (
 	CodeMissingArguments = "missing_arguments"
 	CodeFileUnreadable   = "file_unreadable"
 	CodeInvalidCAFile    = "invalid_ca_file"
+	CodeAWSNotConfigured = "aws_not_configured"
+	CodeAWSAccessDenied  = "aws_access_denied"
+	CodeAWSRequestFailed = "aws_request_failed"
 	CodeOutputFailed     = "output_failed"
 )
 
@@ -23,6 +26,9 @@ var remediations = map[string]string{
 	CodeMissingArguments: "Targets come as arguments, such as expirely example.com, or one per line from --file.",
 	CodeFileUnreadable:   "A --file needs to exist, be readable and hold one target per line of at most 64 KiB; - reads stdin.",
 	CodeInvalidCAFile:    "A --ca-file is a readable PEM file with one or more CERTIFICATE blocks, such as an internal CA's root.",
+	CodeAWSNotConfigured: "expirely aws reads the profile from --profile or AWS_PROFILE and the region from --region, AWS_REGION or that profile, as the AWS CLI does.",
+	CodeAWSAccessDenied:  "The credentials were refused, expired or lack acm:ListCertificates and acm:DescribeCertificate in this account and region.",
+	CodeAWSRequestFailed: "ACM did not answer as expected; the message has its reason, and a later run or a longer --timeout often succeeds.",
 	CodeOutputFailed:     "The reader of stdout closed before the output ended, as a pipe to head does; the scan itself finished.",
 }
 
@@ -33,6 +39,9 @@ var errorCodes = map[string]int{
 	CodeMissingArguments: ExitUsage,
 	CodeFileUnreadable:   ExitUsage,
 	CodeInvalidCAFile:    ExitUsage,
+	CodeAWSNotConfigured: ExitUsage,
+	CodeAWSAccessDenied:  ExitFailure,
+	CodeAWSRequestFailed: ExitFailure,
 	CodeOutputFailed:     ExitFailure,
 }
 

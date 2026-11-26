@@ -357,15 +357,24 @@ func TestDocsListEveryCode(t *testing.T) {
 }
 
 func TestDocsListEveryFlag(t *testing.T) {
-	doc := readDoc(t, filepath.Join("cli", "expirely.mdx"))
-	flags := regexp.MustCompile(`--[a-z][a-z-]*`).FindAllString(usage, -1)
-	if len(flags) == 0 {
-		t.Fatal("found no flags in the usage text")
+	pages := []struct {
+		help string
+		page string
+	}{
+		{usage, filepath.Join("cli", "expirely.mdx")},
+		{awsUsage, filepath.Join("cli", "aws.mdx")},
 	}
-	for _, f := range flags {
-		row := regexp.MustCompile("(?m)^\\|[^|\\n]*`" + regexp.QuoteMeta(f) + "[ `]")
-		if !row.Match(doc) {
-			t.Errorf("docs/cli/expirely.mdx has no table row for %s from the usage text", f)
+	for _, p := range pages {
+		doc := readDoc(t, p.page)
+		flags := regexp.MustCompile(`--[a-z][a-z-]*`).FindAllString(p.help, -1)
+		if len(flags) == 0 {
+			t.Fatalf("found no flags in the help for %s", p.page)
+		}
+		for _, f := range flags {
+			row := regexp.MustCompile("(?m)^\\|[^|\\n]*`" + regexp.QuoteMeta(f) + "[ `]")
+			if !row.Match(doc) {
+				t.Errorf("docs/%s has no table row for %s from its help", p.page, f)
+			}
 		}
 	}
 }

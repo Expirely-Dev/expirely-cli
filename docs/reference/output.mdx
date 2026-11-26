@@ -60,6 +60,7 @@ A field that could not be read is `null`, never zero or a default date.
 | `leaf` | The leaf certificate; `null` on error |
 | `chain` | Every certificate the server sent, leaf first. Present only with `--details`, and `null` on error |
 | `error` | `{"code","reason","message","remediation"}` when the target could not be read; `null` otherwise |
+| `acm` | For `expirely aws` only: what ACM says about the certificate, described in [expirely aws](/cli/aws); absent for scanned targets |
 
 ## Trust issues
 

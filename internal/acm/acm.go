@@ -1,0 +1,117 @@
+// Package acm reads the certificates AWS Certificate Manager holds in one
+// account and region. It only calls ListCertificates and
+// DescribeCertificate, so the IAM permissions it needs are
+// acm:ListCertificates and acm:DescribeCertificate.
+package acm
+
+import (
+	"context"
+	"fmt"
+	"sync"
+	"time"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	sdk "github.com/aws/aws-sdk-go-v2/service/acm"
+	"github.com/aws/aws-sdk-go-v2/service/acm/types"
+)
+
+// API is the part of the ACM client List calls.
+type API interface {
+	ListCertificates(ctx context.Context, in *sdk.ListCertificatesInput, opts ...func(*sdk.Options)) (*sdk.ListCertificatesOutput, error)
+	DescribeCertificate(ctx context.Context, in *sdk.DescribeCertificateInput, opts ...func(*sdk.Options)) (*sdk.DescribeCertificateOutput, error)
+}
+
+// Certificate is one certificate in ACM. NotAfter is nil for a certificate
+// that was never issued, such as one pending validation.
+type Certificate struct {
+	ARN                string
+	Domain             string
+	Type               string
+	Status             string
+	RenewalEligibility string
+	NotAfter           *time.Time
+	InUseBy            []string
+}
+
+// Imported reports whether the certificate was imported into ACM. ACM never
+// renews an imported certificate.
+func (c Certificate) Imported() bool { return c.Type == string(types.CertificateTypeImported) }
+
+// describeConcurrency bounds DescribeCertificate calls, which ACM rate
+// limits per account.
+const describeConcurrency = 8
+
+// List returns every certificate of every key type, in the order ACM lists
+// them, each with the resources that use it. ListCertificates alone would
+// leave out every key type other than RSA 2048.
+func List(ctx context.Context, api API) ([]Certificate, error) {
+	in := &sdk.ListCertificatesInput{Includes: &types.Filters{KeyTypes: types.KeyAlgorithm("").Values()}}
+	var certs []Certificate
+	pages := sdk.NewListCertificatesPaginator(api, in)
+	for pages.HasMorePages() {
+		page, err := pages.NextPage(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("list ACM certificates: %w", err)
+		}
+		for _, s := range page.CertificateSummaryList {
+			certs = append(certs, Certificate{
+				ARN:                aws.ToString(s.CertificateArn),
+				Domain:             aws.ToString(s.DomainName),
+				Type:               string(s.Type),
+				Status:             string(s.Status),
+				RenewalEligibility: string(s.RenewalEligibility),
+				NotAfter:           s.NotAfter,
+			})
+		}
+	}
+	if err := describe(ctx, api, certs); err != nil {
+		return nil, err
+	}
+	return certs, nil
+}
+
+func describe(ctx context.Context, api API, certs []Certificate) error {
+	sem := make(chan struct{}, describeConcurrency)
+	errs := make([]error, len(certs))
+	var wg sync.WaitGroup
+	for i := range certs {
+		sem <- struct{}{}
+		wg.Go(func() {
+			defer func() { <-sem }()
+			out, err := api.DescribeCertificate(ctx, &sdk.DescribeCertificateInput{CertificateArn: aws.String(certs[i].ARN)})
+			if err != nil {
+				errs[i] = fmt.Errorf("describe ACM certificate %s: %w", certs[i].ARN, err)
+				return
+			}
+			if out.Certificate != nil {
+				certs[i].InUseBy = out.Certificate.InUseBy
+			}
+		})
+	}
+	wg.Wait()
+	for _, err := range errs {
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// NewClient builds an ACM client from the AWS configuration: profile and
+// region when given, the environment and shared files otherwise. It returns
+// the region the client uses, which is empty when none is configured.
+func NewClient(ctx context.Context, profile, region string) (*sdk.Client, string, error) {
+	var opts []func(*config.LoadOptions) error
+	if profile != "" {
+		opts = append(opts, config.WithSharedConfigProfile(profile))
+	}
+	if region != "" {
+		opts = append(opts, config.WithRegion(region))
+	}
+	cfg, err := config.LoadDefaultConfig(ctx, opts...)
+	if err != nil {
+		return nil, "", fmt.Errorf("load AWS configuration: %w", err)
+	}
+	return sdk.NewFromConfig(cfg), cfg.Region, nil
+}

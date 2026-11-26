@@ -29,6 +29,9 @@ Scripts and agents match on `code`; a code is never renamed or reused. Each erro
 | `missing_arguments` | 2 | No target was given in the arguments or files |
 | `file_unreadable` | 2 | A `--file` could not be opened or read, or has a line over 64 KiB |
 | `invalid_ca_file` | 2 | A `--ca-file` could not be read, holds no PEM certificate, or holds one that does not parse |
+| `aws_not_configured` | 2 | `expirely aws` found no region, or the profile does not exist in the shared AWS config |
+| `aws_access_denied` | 3 | AWS refused the credentials, they expired, or they lack the ACM read permissions |
+| `aws_request_failed` | 3 | Another AWS failure, such as a timeout or a throttled request |
 | `output_failed` | 3 | Writing the result to stdout failed, for example a closed pipe |
 
 A target that could not be read is a result, not a command error: its `status` is `error` and its `error.code` is one of these.
