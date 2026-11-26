@@ -27,4 +27,4 @@ Titles follow Conventional Commits: `<type>(<scope>): <summary>`, imperative, lo
 
 ## Release
 
-Pushing a tag `vX.Y.Z` runs `.github/workflows/release.yml`: it runs `just check-ci`, then GoReleaser builds the archives and `checksums.txt` and opens a draft GitHub release, which a maintainer reviews and publishes. `just snapshot` builds the same archives into `./dist` without publishing.
+A release starts with a section for its version in `CHANGELOG.md`, with breaking changes under **Breaking**. Pushing a tag `vX.Y.Z` then runs `.github/workflows/release.yml`: it runs `just check-ci`, then GoReleaser builds the archives and `checksums.txt` and opens a draft GitHub release, which a maintainer reviews and publishes. `just snapshot` builds the same archives into `./dist` without publishing.

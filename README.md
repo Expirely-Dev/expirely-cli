@@ -15,7 +15,7 @@ Exit code 1 means a certificate is expired or expiring, so the same command work
 
 ## Status
 
-expirely is in early development. Until 1.0, flags, JSON fields and codes can change between releases.
+expirely is in early development. Until 1.0, a release can change flags, JSON fields and codes, and the [changelog](CHANGELOG.md) says what to change.
 
 ## Install
 
