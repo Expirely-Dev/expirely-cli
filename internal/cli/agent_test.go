@@ -105,3 +105,43 @@ func TestRunJSONFalseGivesTextOutsideATerminal(t *testing.T) {
 		t.Errorf("stdout = %q, want the text output that --json=false asks for", stdout)
 	}
 }
+
+func TestUsageErrorsGiveAgentsTheWholeHelp(t *testing.T) {
+	tests := []struct {
+		name      string
+		env       map[string]string
+		terminal  bool
+		args      []string
+		wantUsage bool
+	}{
+		{name: "a person gets the short error", terminal: true, args: []string{"--nope"}},
+		{name: "a declared agent gets usage in the envelope", env: map[string]string{"AI_AGENT": "goose"}, terminal: true, args: []string{"--nope"}, wantUsage: true},
+		{name: "a detected agent gets usage in text", env: map[string]string{"GEMINI_CLI": "1"}, terminal: true, args: []string{"--nope"}, wantUsage: true},
+		{name: "an agent with no targets gets usage, not the intro", env: map[string]string{"GEMINI_CLI": "1"}, terminal: true, wantUsage: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			code := Run(context.Background(), tt.args, Streams{
+				Stdin:            strings.NewReader(""),
+				Stdout:           &stdout,
+				Stderr:           &stderr,
+				StdoutIsTerminal: tt.terminal,
+				Getenv:           envOf(tt.env),
+			})
+
+			if code != ExitUsage {
+				t.Errorf("exit code = %d, want %d", code, ExitUsage)
+			}
+			var env envelope
+			isJSON := json.Unmarshal(stderr.Bytes(), &env) == nil
+			gotUsage := strings.Contains(stderr.String(), "Exit codes") || (isJSON && env.Error.Usage == usage)
+			if gotUsage != tt.wantUsage {
+				t.Errorf("whole help in stderr = %v, want %v:\n%s", gotUsage, tt.wantUsage, stderr.String())
+			}
+			if strings.Contains(stderr.String(), intro) && tt.env != nil {
+				t.Errorf("stderr = %q, want no intro for an agent", stderr.String())
+			}
+		})
+	}
+}

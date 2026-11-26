@@ -32,7 +32,7 @@ Some agents run commands under a pseudo-terminal, where expirely would otherwise
 | `GEMINI_CLI`, `CURSOR_AGENT`, `COPILOT_CLI`, `OPENCODE`, `CLAUDE_CODE_CHILD_SESSION` | detected | no color, no spinner |
 | `CLAUDECODE=1`, only when stdout is not a terminal            | detected   | no color, no spinner            |
 
-A declared agent said what it is, so it gets JSON even on a terminal. `CLAUDECODE` alone is not enough on a terminal, because IDE terminals that people type in set it too. An explicit `--json` or `--json=false` wins over all of this.
+A detected agent that makes a usage error also gets the whole help, in the `usage` field of the error envelope or after the message in text, since it cannot glance at `--help` the way a person does. A declared agent said what it is, so it gets JSON even on a terminal. `CLAUDECODE` alone is not enough on a terminal, because IDE terminals that people type in set it too. An explicit `--json` or `--json=false` wins over all of this.
 
 ## Decide on the exit code
 

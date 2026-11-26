@@ -16,7 +16,7 @@ When a scan has several outcomes, 1 wins over 3.
 
 ## Error codes
 
-Scripts and agents match on `code`; a code is never renamed or reused. Each error also carries a `remediation`, shown on the line after the message in text, saying what resolves it. A command error is one JSON line on stderr when output is JSON:
+Scripts and agents match on `code`; a code is never renamed or reused. Each error also carries a `remediation`, shown on the line after the message in text, saying what resolves it. When an AI agent is detected, a usage error (exit `2`) also carries `usage`, the whole help. A command error is one JSON line on stderr when output is JSON:
 
 ```json
 {"error":{"code":"invalid_flag","message":"unknown flag --nope","remediation":"expirely --help lists every flag and the values it accepts."}}

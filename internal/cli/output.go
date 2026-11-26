@@ -49,36 +49,54 @@ func newReport(now time.Time, warnDays int, findings []scan.Finding, details boo
 	return report{SchemaVersion: schemaVersion, ScannedAt: now.UTC(), WarnDays: warnDays, Summary: summary, Results: findings}
 }
 
-// envelope is the JSON a command error prints on stderr.
+// mode is how a run reports: JSON or text, and whether an AI agent is
+// reading.
+type mode struct {
+	json  bool
+	agent bool
+}
+
+// envelope is the JSON a command error prints on stderr. Usage holds the
+// whole help, only for a usage error read by an agent.
 type envelope struct {
 	Error struct {
 		Code        string `json:"code"`
 		Message     string `json:"message"`
 		Remediation string `json:"remediation"`
+		Usage       string `json:"usage,omitempty"`
 	} `json:"error"`
 }
 
 // fail prints e and returns its exit code. In JSON it prints the envelope;
 // in text it prints the message and, on the next line, what resolves it.
-func fail(s Streams, jsonOut bool, e *Error) int {
+// A usage error read by an agent also gets the whole help, since an agent
+// cannot ask for --help the way a person glances at it.
+func fail(s Streams, m mode, e *Error) int {
 	code := errorCodes[e.Code]
-	if jsonOut {
+	withUsage := m.agent && code == ExitUsage
+	if m.json {
 		var body envelope
 		body.Error.Code = e.Code
 		body.Error.Message = e.Message
 		body.Error.Remediation = remediations[e.Code]
+		if withUsage {
+			body.Error.Usage = usage
+		}
 		if err := json.NewEncoder(s.Stderr).Encode(body); err != nil {
 			fmt.Fprintf(s.Stderr, "expirely: %s (%s)\n", e.Message, e.Code)
 		}
 		return code
 	}
 	fmt.Fprintf(s.Stderr, "expirely: %s\n%s\n", ui.Clean(e.Message), remediations[e.Code])
+	if withUsage {
+		fmt.Fprintf(s.Stderr, "\n%s", usage)
+	}
 	return code
 }
 
-func writeJSON(s Streams, jsonOut bool, v any) int {
+func writeJSON(s Streams, m mode, v any) int {
 	if err := json.NewEncoder(s.Stdout).Encode(v); err != nil {
-		return fail(s, jsonOut, failf(CodeOutputFailed, "write output: %v", err))
+		return fail(s, m, failf(CodeOutputFailed, "write output: %v", err))
 	}
 	return ExitOK
 }

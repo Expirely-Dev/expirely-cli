@@ -106,6 +106,7 @@ func Run(ctx context.Context, args []string, s Streams) int {
 		s.Style = ui.Style{}
 	}
 	jsonOut := !s.StdoutIsTerminal || ag.Declared || wantsJSON(args)
+	out := func() mode { return mode{json: jsonOut, agent: ag.Name != ""} }
 
 	fs := flag.NewFlagSet("expirely", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
@@ -124,7 +125,7 @@ func Run(ctx context.Context, args []string, s Streams) int {
 			fmt.Fprint(s.Stdout, usage)
 			return ExitOK
 		}
-		return fail(s, jsonOut, failf(CodeInvalidFlag, "%s", flagError(err)))
+		return fail(s, out(), failf(CodeInvalidFlag, "%s", flagError(err)))
 	}
 
 	fs.Visit(func(f *flag.Flag) {
@@ -134,31 +135,31 @@ func Run(ctx context.Context, args []string, s Streams) int {
 	})
 
 	if *showVersion {
-		return printVersion(s, jsonOut)
+		return printVersion(s, out())
 	}
 	if *warnDays < 0 {
-		return fail(s, jsonOut, failf(CodeInvalidFlag, "--warn-days must be 0 or more, got %d", *warnDays))
+		return fail(s, out(), failf(CodeInvalidFlag, "--warn-days must be 0 or more, got %d", *warnDays))
 	}
 	if *timeout <= 0 {
-		return fail(s, jsonOut, failf(CodeInvalidFlag, "--timeout must be positive, got %s", *timeout))
+		return fail(s, out(), failf(CodeInvalidFlag, "--timeout must be positive, got %s", *timeout))
 	}
 	if *concurrency < 1 {
-		return fail(s, jsonOut, failf(CodeInvalidFlag, "--concurrency must be 1 or more, got %d", *concurrency))
+		return fail(s, out(), failf(CodeInvalidFlag, "--concurrency must be 1 or more, got %d", *concurrency))
 	}
 
 	targets, e := collectTargets(fs.Args(), files, s.Stdin)
 	if e != nil {
-		return fail(s, jsonOut, e)
+		return fail(s, out(), e)
 	}
 	if len(targets) == 0 {
 		if len(files) > 0 {
-			return fail(s, jsonOut, failf(CodeMissingArguments, "no targets in %s", strings.Join(fileNames(files), ", ")))
+			return fail(s, out(), failf(CodeMissingArguments, "no targets in %s", strings.Join(fileNames(files), ", ")))
 		}
-		if !jsonOut {
+		if !jsonOut && ag.Name == "" {
 			fmt.Fprint(s.Stderr, intro)
 			return errorCodes[CodeMissingArguments]
 		}
-		return fail(s, jsonOut, failf(CodeMissingArguments, "no targets: pass a host, host:port or https:// URL, or --file"))
+		return fail(s, out(), failf(CodeMissingArguments, "no targets: pass a host, host:port or https:// URL, or --file"))
 	}
 
 	now := time.Now()
@@ -181,7 +182,7 @@ func Run(ctx context.Context, args []string, s Streams) int {
 
 	report := newReport(now, *warnDays, findings, *details)
 	if jsonOut {
-		if code := writeJSON(s, jsonOut, report); code != ExitOK {
+		if code := writeJSON(s, out(), report); code != ExitOK {
 			return code
 		}
 	} else {
@@ -211,9 +212,9 @@ func wantsJSON(args []string) bool {
 	})
 }
 
-func printVersion(s Streams, jsonOut bool) int {
-	if jsonOut {
-		return writeJSON(s, jsonOut, map[string]string{"version": version()})
+func printVersion(s Streams, m mode) int {
+	if m.json {
+		return writeJSON(s, m, map[string]string{"version": version()})
 	}
 	fmt.Fprintf(s.Stdout, "expirely %s\n", version())
 	return ExitOK
