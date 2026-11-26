@@ -185,7 +185,12 @@ func TestScanBoundsConcurrencyAndKeepsOrder(t *testing.T) {
 	}
 	p := &slowProber{}
 
-	got := Scan(context.Background(), p, targets, Options{Warn: 0, Timeout: time.Second, Now: now, Concurrency: limit})
+	var progress atomic.Int32
+	got := Scan(context.Background(), p, targets, Options{Warn: 0, Timeout: time.Second, Now: now, Concurrency: limit, Progress: func() { progress.Add(1) }})
+
+	if n := int(progress.Load()); n != len(targets) {
+		t.Errorf("Progress called %d times, want once per target (%d)", n, len(targets))
+	}
 
 	if peak := p.peak.Load(); peak > limit || peak < 2 {
 		t.Errorf("peak concurrent probes = %d, want between 2 and %d", peak, limit)

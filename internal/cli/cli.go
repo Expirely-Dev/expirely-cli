@@ -34,12 +34,14 @@ const (
 
 // Streams holds the standard streams Run reads from and writes to.
 // StdoutIsTerminal selects text output when --json is not set, and Style is
-// how stdout shows that text; the zero Style is plain.
+// how stdout shows that text; the zero Style is plain. StderrIsTerminal
+// allows a progress spinner on stderr while a scan runs.
 type Streams struct {
 	Stdin            io.Reader
 	Stdout           io.Writer
 	Stderr           io.Writer
 	StdoutIsTerminal bool
+	StderrIsTerminal bool
 	Style            ui.Style
 }
 
@@ -147,12 +149,21 @@ func Run(ctx context.Context, args []string, s Streams) int {
 
 	now := time.Now()
 	start := time.Now()
-	findings := scan.Scan(ctx, probe.Prober{}, targets, scan.Options{
+	opts := scan.Options{
 		Warn:        time.Duration(*warnDays) * 24 * time.Hour,
 		Timeout:     *timeout,
 		Now:         now,
 		Concurrency: *concurrency,
-	})
+	}
+	var spinner *ui.Spinner
+	if s.StderrIsTerminal {
+		spinner = ui.StartSpinner(s.Stderr, len(targets))
+		opts.Progress = spinner.Done
+	}
+	findings := scan.Scan(ctx, probe.Prober{}, targets, opts)
+	if spinner != nil {
+		spinner.Stop()
+	}
 
 	report := newReport(now, *warnDays, findings)
 	if jsonOut {

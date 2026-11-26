@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -246,6 +247,36 @@ func TestRunScanJSON(t *testing.T) {
 				t.Errorf("summary = %v, want a count for %q", got.Summary, tt.wantStatus[0])
 			}
 		})
+	}
+}
+
+func TestRunShowsProgressOnlyOnATerminal(t *testing.T) {
+	release := make(chan struct{})
+	slow := tlstest.Serve(t, func(net.Conn) { <-release })
+	t.Cleanup(func() { close(release) })
+	args := []string{"--timeout", "400ms", fmt.Sprintf("localhost:%d", slow)}
+
+	for _, terminal := range []bool{true, false} {
+		var stdout, stderr bytes.Buffer
+		Run(context.Background(), args, Streams{
+			Stdin:            strings.NewReader(""),
+			Stdout:           &stdout,
+			Stderr:           &stderr,
+			StdoutIsTerminal: true,
+			StderrIsTerminal: terminal,
+		})
+
+		switch {
+		case terminal && !strings.Contains(stderr.String(), "Scanning 1 target"):
+			t.Errorf("stderr on a terminal = %q, want the spinner", stderr.String())
+		case terminal && !strings.HasSuffix(stderr.String(), "\r\x1b[2K"):
+			t.Errorf("stderr on a terminal = %q, want the spinner line erased at the end", stderr.String())
+		case !terminal && stderr.Len() != 0:
+			t.Errorf("stderr without a terminal = %q, want nothing", stderr.String())
+		}
+		if strings.Contains(stdout.String(), "Scanning") {
+			t.Errorf("stdout = %q, want the spinner kept off stdout", stdout.String())
+		}
 	}
 }
 

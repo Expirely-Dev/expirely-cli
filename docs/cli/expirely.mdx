@@ -53,6 +53,7 @@ The text output has one line per target, most urgent first, then the counts and 
 - The default port is left out, as in `example.com`; other ports are shown.
 - A chain that is not trusted says why: `self-signed`, `untrusted issuer`, `wrong name` or `not trusted`. An expired chain needs no note.
 - In a terminal with color, `expired` and `failed` are red, `expiring` is yellow and `ok` is green. With `NO_COLOR` set or `TERM=dumb` the text is the same without color.
+- While a scan that takes longer than 150 ms runs, stderr shows `Scanning N targets` with the count finished so far, and erases that line before the results print. It appears only when stderr is a terminal, so pipes, logs, CI and agents never see it.
 
 Text taken from certificates and errors has its control characters removed before it reaches a terminal.
 

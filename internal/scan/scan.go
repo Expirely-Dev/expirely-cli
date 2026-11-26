@@ -85,6 +85,9 @@ type Options struct {
 	Now time.Time
 	// Concurrency is the most targets probed at once; values below 1 mean 1.
 	Concurrency int
+	// Progress, when set, is called once as each target finishes, from the
+	// goroutine that probed it, so it must be safe for concurrent use.
+	Progress func()
 }
 
 // Scan probes the targets, at most opts.Concurrency at a time, and returns
@@ -100,6 +103,9 @@ func Scan(ctx context.Context, p Prober, targets []target.Target, opts Options) 
 		wg.Go(func() {
 			defer func() { <-sem }()
 			findings[i] = scanOne(ctx, p, t, opts)
+			if opts.Progress != nil {
+				opts.Progress()
+			}
 		})
 	}
 	wg.Wait()

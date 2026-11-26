@@ -42,4 +42,4 @@ Messages and reasons are for people and can change. Codes and `trust_issue` valu
 
 ## Safe to run
 
-expirely only reads. It completes a TLS handshake and closes the connection, sends no application data and no credentials, and removes control characters from text taken from certificates before printing it in a terminal.
+expirely only reads. It completes a TLS handshake and closes the connection, sends no application data and no credentials, and removes control characters from text taken from certificates before printing it in a terminal. Its progress spinner is drawn only when stderr is a terminal, so a program reading stderr gets errors and nothing else.
