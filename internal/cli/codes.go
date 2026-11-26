@@ -9,6 +9,7 @@ const (
 	CodeInvalidFlag      = "invalid_flag"
 	CodeInvalidTarget    = "invalid_target"
 	CodeMissingArguments = "missing_arguments"
+	CodeFileUnreadable   = "file_unreadable"
 	CodeOutputFailed     = "output_failed"
 )
 
@@ -17,6 +18,7 @@ var errorCodes = map[string]int{
 	CodeInvalidFlag:      ExitUsage,
 	CodeInvalidTarget:    ExitUsage,
 	CodeMissingArguments: ExitUsage,
+	CodeFileUnreadable:   ExitUsage,
 	CodeOutputFailed:     ExitFailure,
 }
 

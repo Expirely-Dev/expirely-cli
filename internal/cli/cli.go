@@ -18,7 +18,6 @@ import (
 
 	"github.com/bycavii/expirely-cli/internal/probe"
 	"github.com/bycavii/expirely-cli/internal/scan"
-	"github.com/bycavii/expirely-cli/internal/target"
 )
 
 // Exit codes returned by Run, in order of precedence when a scan has
@@ -41,18 +40,23 @@ type Streams struct {
 }
 
 const (
-	defaultWarnDays = 30
-	defaultTimeout  = 10 * time.Second
+	defaultWarnDays    = 30
+	defaultTimeout     = 10 * time.Second
+	defaultConcurrency = 16
 )
 
-const usage = `Usage: expirely [flags] TARGET...
+const usage = `Usage: expirely [flags] [TARGET...]
 
 Find every TLS certificate you serve and when it expires.
 
 TARGET is host, host:port, [ipv6]:port or an https:// URL; the port
-defaults to 443.
+defaults to 443. Targets come from arguments and from --file, in that
+order; repeats are scanned once.
 
 Flags:
+      --concurrency N    targets scanned at once (default 16)
+  -f, --file PATH        read targets from PATH, one per line; - reads stdin;
+                         repeatable; blank lines and # comments are skipped
   -h, --help             show this help
       --json             print JSON; the default when stdout is not a terminal
       --timeout DURATION time allowed per target to connect and handshake (default 10s)
@@ -75,6 +79,10 @@ func Run(ctx context.Context, args []string, s Streams) int {
 	fs.Bool("json", false, "")
 	warnDays := fs.Int("warn-days", defaultWarnDays, "")
 	timeout := fs.Duration("timeout", defaultTimeout, "")
+	concurrency := fs.Int("concurrency", defaultConcurrency, "")
+	var files fileList
+	fs.Var(&files, "file", "")
+	fs.Var(&files, "f", "")
 
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -93,24 +101,24 @@ func Run(ctx context.Context, args []string, s Streams) int {
 	if *timeout <= 0 {
 		return fail(s, jsonOut, failf(CodeInvalidFlag, "--timeout must be positive, got %s", *timeout))
 	}
-	if fs.NArg() == 0 {
-		return fail(s, jsonOut, failf(CodeMissingArguments, "no targets: pass at least one host, host:port or https:// URL"))
+	if *concurrency < 1 {
+		return fail(s, jsonOut, failf(CodeInvalidFlag, "--concurrency must be 1 or more, got %d", *concurrency))
 	}
 
-	targets := make([]target.Target, 0, fs.NArg())
-	for _, arg := range fs.Args() {
-		t, err := target.Parse(arg)
-		if err != nil {
-			return fail(s, jsonOut, failf(CodeInvalidTarget, "%v", err))
-		}
-		targets = append(targets, t)
+	targets, e := collectTargets(fs.Args(), files, s.Stdin)
+	if e != nil {
+		return fail(s, jsonOut, e)
+	}
+	if len(targets) == 0 {
+		return fail(s, jsonOut, failf(CodeMissingArguments, "no targets: pass a host, host:port or https:// URL, or --file"))
 	}
 
 	now := time.Now()
 	findings := scan.Scan(ctx, probe.Prober{}, targets, scan.Options{
-		Warn:    time.Duration(*warnDays) * 24 * time.Hour,
-		Timeout: *timeout,
-		Now:     now,
+		Warn:        time.Duration(*warnDays) * 24 * time.Hour,
+		Timeout:     *timeout,
+		Now:         now,
+		Concurrency: *concurrency,
 	})
 
 	report := newReport(now, *warnDays, findings)

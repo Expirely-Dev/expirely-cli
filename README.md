@@ -26,13 +26,19 @@ just build
 ## Usage
 
 ```sh
-expirely [flags] TARGET...
+expirely [flags] [TARGET...]
+expirely -f targets.txt
+kubectl get ingress -A -o jsonpath='{range .items[*].spec.tls[*].hosts[*]}{@}{"\n"}{end}' | expirely -f -
 ```
 
 `TARGET` is `host`, `host:port`, `[ipv6]:port`, a bare IP address or an `https://` URL; the port defaults to 443. Other URL schemes, credentials in a URL and ports outside 1-65535 are rejected before anything is scanned.
 
+Targets come from the arguments first, then from each `--file` in order. A file has one target per line; blank lines and lines starting with `#` are skipped, and `-` reads stdin. A target given twice is scanned once, at its first position. An invalid line stops the command before any scan and names the file and line.
+
 | Flag | Default | Meaning |
 |---|---|---|
+| `--concurrency` | `16` | Targets scanned at once |
+| `-f`, `--file` | | Read targets from a file, `-` for stdin; repeatable |
 | `--json` | off | Print JSON; also the default when stdout is not a terminal |
 | `--timeout` | `10s` | Time allowed per target to connect and complete the handshake |
 | `--version` | | Print the version |
@@ -75,7 +81,7 @@ When a scan has several outcomes, the lowest non-zero code in this order wins: 1
 |---|---|
 | 0 | Every target is `ok`, or `--help` or `--version` ran |
 | 1 | At least one certificate is `expired` or `expiring` |
-| 2 | Usage error: bad flag, invalid target or no targets |
+| 2 | Usage error: bad flag, invalid target, unreadable `--file` or no targets |
 | 3 | At least one target could not be read, or writing the output failed |
 
 ## Error codes
@@ -86,7 +92,8 @@ Scripts and agents match on `code`; a code is never renamed or reused.
 |---|---|---|
 | `invalid_flag` | 2 | A flag is unknown or has a bad value |
 | `invalid_target` | 2 | A target is not a host, host:port or https:// URL |
-| `missing_arguments` | 2 | No target was given |
+| `missing_arguments` | 2 | No target was given in the arguments or files |
+| `file_unreadable` | 2 | A `--file` could not be opened or read, or has a line over 64 KiB |
 | `output_failed` | 3 | Writing the result to stdout failed, for example a closed pipe |
 | `dial_failed` | 3 | `results[].error`: the TCP connection to the target failed |
 | `handshake_failed` | 3 | `results[].error`: the TLS handshake failed or sent no certificate |

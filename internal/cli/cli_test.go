@@ -38,7 +38,7 @@ func TestRunText(t *testing.T) {
 		{
 			name:       "no targets prints usage to stderr",
 			wantCode:   ExitUsage,
-			wantStderr: "expirely: no targets: pass at least one host, host:port or https:// URL\n\nUsage: expirely",
+			wantStderr: "expirely: no targets: pass a host, host:port or https:// URL, or --file\n\nUsage: expirely",
 		},
 		{
 			name:       "help prints usage to stdout",

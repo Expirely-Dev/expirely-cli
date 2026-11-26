@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/bycavii/expirely-cli/internal/probe"
@@ -77,16 +78,26 @@ type Options struct {
 	Timeout time.Duration
 	// Now is the time findings are computed at.
 	Now time.Time
+	// Concurrency is the most targets probed at once; values below 1 mean 1.
+	Concurrency int
 }
 
-// Scan probes each target in order and returns one finding per target, in
-// the same order. A target that cannot be read becomes a StatusError
-// finding; Scan itself does not fail.
+// Scan probes the targets, at most opts.Concurrency at a time, and returns
+// one finding per target in the order of targets. A target that cannot be
+// read becomes a StatusError finding; Scan itself does not fail. Every
+// goroutine Scan starts has returned when Scan returns.
 func Scan(ctx context.Context, p Prober, targets []target.Target, opts Options) []Finding {
-	findings := make([]Finding, 0, len(targets))
-	for _, t := range targets {
-		findings = append(findings, scanOne(ctx, p, t, opts))
+	findings := make([]Finding, len(targets))
+	sem := make(chan struct{}, max(opts.Concurrency, 1))
+	var wg sync.WaitGroup
+	for i, t := range targets {
+		sem <- struct{}{}
+		wg.Go(func() {
+			defer func() { <-sem }()
+			findings[i] = scanOne(ctx, p, t, opts)
+		})
 	}
+	wg.Wait()
 	return findings
 }
 

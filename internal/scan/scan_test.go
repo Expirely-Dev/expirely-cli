@@ -5,7 +5,9 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"errors"
+	"fmt"
 	"math/big"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -151,5 +153,63 @@ func TestScan(t *testing.T) {
 		if f.DaysLeft != nil || f.Leaf != nil || f.Trusted != nil {
 			t.Errorf("findings[%d] error finding has certificate fields: %+v", i, f)
 		}
+	}
+}
+
+type slowProber struct {
+	inFlight, peak atomic.Int32
+}
+
+func (p *slowProber) Probe(ctx context.Context, t target.Target) (probe.Result, error) {
+	n := p.inFlight.Add(1)
+	defer p.inFlight.Add(-1)
+	for {
+		old := p.peak.Load()
+		if n <= old || p.peak.CompareAndSwap(old, n) {
+			break
+		}
+	}
+	select {
+	case <-time.After(20 * time.Millisecond):
+	case <-ctx.Done():
+		return probe.Result{}, ctx.Err()
+	}
+	return probe.Result{Target: t, Chain: []*x509.Certificate{cert(t.Host, now.Add(time.Duration(t.Port)*24*time.Hour))}}, nil
+}
+
+func TestScanBoundsConcurrencyAndKeepsOrder(t *testing.T) {
+	const limit = 4
+	var targets []target.Target
+	for i := 1; i <= 20; i++ {
+		targets = append(targets, target.Target{Host: fmt.Sprintf("h%d.example", i), Port: i})
+	}
+	p := &slowProber{}
+
+	got := Scan(context.Background(), p, targets, Options{Warn: 0, Timeout: time.Second, Now: now, Concurrency: limit})
+
+	if peak := p.peak.Load(); peak > limit || peak < 2 {
+		t.Errorf("peak concurrent probes = %d, want between 2 and %d", peak, limit)
+	}
+	if p.inFlight.Load() != 0 {
+		t.Errorf("probes still in flight after Scan returned: %d", p.inFlight.Load())
+	}
+	for i, f := range got {
+		if f.Target != targets[i].String() {
+			t.Errorf("findings[%d].Target = %q, want %q", i, f.Target, targets[i].String())
+		}
+		if f.DaysLeft == nil || *f.DaysLeft != targets[i].Port {
+			t.Errorf("findings[%d].DaysLeft = %v, want %d", i, f.DaysLeft, targets[i].Port)
+		}
+	}
+}
+
+func TestScanConcurrencyBelowOne(t *testing.T) {
+	p := &slowProber{}
+	targets := []target.Target{{Host: "a.example", Port: 1}, {Host: "b.example", Port: 2}}
+
+	got := Scan(context.Background(), p, targets, Options{Timeout: time.Second, Now: now, Concurrency: 0})
+
+	if len(got) != 2 || p.peak.Load() != 1 {
+		t.Errorf("len(findings) = %d, peak = %d, want 2 findings probed one at a time", len(got), p.peak.Load())
 	}
 }
