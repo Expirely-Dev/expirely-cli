@@ -17,6 +17,7 @@ just build
 just fmt
 just check      # offline: gofmt, vet, golangci-lint, race tests, build, tidy
 just check-ci   # what CI runs: check plus govulncheck
+just fuzz       # fuzz the target parser for 60s (just fuzz 5m for longer)
 ```
 
 The repository rules for people and coding agents are in [AGENTS.md](AGENTS.md).

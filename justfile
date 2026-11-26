@@ -16,6 +16,10 @@ lint:
 vuln:
     {{govulncheck}} ./...
 
+# Fuzz the target parser; failures are saved under internal/target/testdata as regression inputs.
+fuzz time="60s":
+    go test ./internal/target/ -run '^$' -fuzz FuzzParse -fuzztime {{time}}
+
 # Run every offline check: formatting, vet, lint, race tests, build and module tidiness.
 check:
     test -z "$(gofmt -l .)"
