@@ -1,3 +1,6 @@
+golangci := "go tool -modfile=tools/golangci-lint/go.mod golangci-lint"
+govulncheck := "go tool -modfile=tools/govulncheck/go.mod govulncheck"
+
 default:
     @just --list
 
@@ -5,16 +8,26 @@ default:
 fmt:
     gofmt -w .
 
-# Run every local check: formatting, vet, race tests, build and module tidiness.
+# Run the pinned linters.
+lint:
+    {{golangci}} run ./...
+
+# Check dependencies against the Go vulnerability database; needs network.
+vuln:
+    {{govulncheck}} ./...
+
+# Run every offline check: formatting, vet, lint, race tests, build and module tidiness.
 check:
     test -z "$(gofmt -l .)"
     go vet ./...
+    {{golangci}} run ./...
     go test ./... -race -count=1
     go build ./...
     go mod tidy -diff
+    for dir in tools/*/; do (cd "$dir" && go mod tidy -diff) || exit 1; done
 
-# Run the checks CI runs.
-check-ci: check
+# Run the checks CI runs: every offline check plus the vulnerability scan.
+check-ci: check vuln
 
 # Build the binary into ./bin.
 build:

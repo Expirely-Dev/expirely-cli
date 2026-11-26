@@ -15,7 +15,8 @@ just build
 
 ```sh
 just fmt
-just check
+just check      # offline: gofmt, vet, golangci-lint, race tests, build, tidy
+just check-ci   # what CI runs: check plus govulncheck
 ```
 
 The repository rules for people and coding agents are in [AGENTS.md](AGENTS.md).

@@ -15,7 +15,7 @@ Rules for agents working in this repository. `expirely` is a read-only CLI: it i
 - Every network call takes a `context.Context` and has a deadline; concurrent scans run through a bounded pool whose goroutines all end before `Run` returns.
 - The tool reads certificates and nothing else: it never writes to a target, never sends credentials, and never handles private keys.
 - Tests stay offline: they use local TLS listeners with certificates generated in the test, never the internet.
-- The standard library comes first. A new module is pinned to an exact version with `go.sum` committed; developer tools are pinned in `tools/go.mod` and run with `go tool -modfile=tools/go.mod`.
+- The standard library comes first. A new module is pinned to an exact version with `go.sum` committed; each developer tool is pinned in its own `tools/<tool>/go.mod` and runs through the `justfile`.
 
 ## Before handing a change back
 
