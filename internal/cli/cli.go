@@ -87,6 +87,7 @@ Scan
 
 Output
       --json              print JSON; the default when stdout is not a terminal
+      --details           add every certificate of each chain to the JSON
       --version           print the version
   -h, --help              show this help
 
@@ -113,6 +114,7 @@ func Run(ctx context.Context, args []string, s Streams) int {
 	warnDays := fs.Int("warn-days", defaultWarnDays, "")
 	timeout := fs.Duration("timeout", defaultTimeout, "")
 	concurrency := fs.Int("concurrency", defaultConcurrency, "")
+	details := fs.Bool("details", false, "")
 	var files fileList
 	fs.Var(&files, "file", "")
 	fs.Var(&files, "f", "")
@@ -177,7 +179,7 @@ func Run(ctx context.Context, args []string, s Streams) int {
 		spinner.Stop()
 	}
 
-	report := newReport(now, *warnDays, findings)
+	report := newReport(now, *warnDays, findings, *details)
 	if jsonOut {
 		if code := writeJSON(s, jsonOut, report); code != ExitOK {
 			return code

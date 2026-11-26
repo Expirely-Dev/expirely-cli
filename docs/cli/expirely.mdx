@@ -15,6 +15,7 @@ expirely -f targets.txt --concurrency 64 --timeout 3s
 | Flag                 | Description                                                                                       |
 | -------------------- | ------------------------------------------------------------------------------------------------- |
 | `--concurrency N`    | Targets scanned at once, `1` or more. Default `16`                                                |
+| `--details`          | Add every certificate of each chain to the JSON, as `chain`. Without it, each result keeps only the leaf |
 | `-f`, `--file PATH`  | Read targets from `PATH`, one per line; `-` reads stdin. Can be given more than once              |
 | `-h`, `--help`       | Print the help as text and exit `0`                                                               |
 | `--json`             | Print JSON. Also the default when stdout is not a terminal                                        |

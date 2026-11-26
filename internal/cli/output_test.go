@@ -2,7 +2,9 @@ package cli
 
 import (
 	"bytes"
+	"encoding/json"
 	"flag"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,6 +12,7 @@ import (
 	"time"
 
 	"github.com/bycavii/expirely-cli/internal/scan"
+	"github.com/bycavii/expirely-cli/internal/tlstest"
 	"github.com/bycavii/expirely-cli/internal/ui"
 	"github.com/charmbracelet/colorprofile"
 	"github.com/charmbracelet/x/ansi"
@@ -36,7 +39,7 @@ func sampleReport() report {
 		{Target: "self-signed.badssl.com:443", Status: scan.StatusOK, DaysLeft: ptr(727), ExpiresAt: expires("2028-11-23T21:00:00Z"), Trusted: ptr(false), TrustIssue: ptr(scan.TrustSelfSigned)},
 		{Target: "evil\x1b[2J.example:443", Status: scan.StatusOK, DaysLeft: ptr(0), ExpiresAt: expires("2026-11-27T01:00:00Z"), Trusted: ptr(false), TrustIssue: ptr(scan.TrustUnknownAuthority)},
 	}
-	return newReport(time.Date(2026, 11, 26, 22, 0, 0, 0, time.UTC), 30, findings)
+	return newReport(time.Date(2026, 11, 26, 22, 0, 0, 0, time.UTC), 30, findings, false)
 }
 
 func TestWriteTextGolden(t *testing.T) {
@@ -103,6 +106,35 @@ func TestDuration(t *testing.T) {
 	for d, want := range tests {
 		if got := duration(d); got != want {
 			t.Errorf("duration(%v) = %q, want %q", d, got, want)
+		}
+	}
+}
+
+func TestRunJSONLeavesTheChainOutUnlessAsked(t *testing.T) {
+	ca := tlstest.NewCA(t)
+	target := fmt.Sprintf("localhost:%d", tlstest.ServeTLS(t, ca.Leaf(t, "localhost", time.Now().Add(90*24*time.Hour))))
+
+	for _, details := range []bool{false, true} {
+		args := []string{target}
+		if details {
+			args = append([]string{"--details"}, args...)
+		}
+		_, stdout, _ := run(t, false, args...)
+
+		var got struct {
+			SchemaVersion *int `json:"schema_version"`
+			Results       []map[string]json.RawMessage
+		}
+		if err := json.Unmarshal([]byte(stdout), &got); err != nil {
+			t.Fatalf("stdout is not the JSON report: %v\n%s", err, stdout)
+		}
+		if got.SchemaVersion == nil || *got.SchemaVersion != 1 {
+			t.Errorf("schema_version = %v, want 1", got.SchemaVersion)
+		}
+		_, hasChain := got.Results[0]["chain"]
+		_, hasLeaf := got.Results[0]["leaf"]
+		if hasChain != details || !hasLeaf {
+			t.Errorf("--details=%v: chain present = %v, leaf present = %v; want chain only with --details and the leaf always", details, hasChain, hasLeaf)
 		}
 	}
 }

@@ -3,11 +3,12 @@ title: Output
 description: The fields of the JSON report and the error envelope.
 ---
 
-expirely prints this report when `--json` is set or stdout is not a terminal. This is the output of `expirely --json expired.badssl.com`, with `chain` shortened:
+expirely prints this report when `--json` is set or stdout is not a terminal. This is the output of `expirely --json expired.badssl.com`:
 
 ```json
 {
-  "scanned_at": "2026-11-26T22:34:41.357344Z",
+  "schema_version": 1,
+  "scanned_at": "2026-11-26T23:13:59.39399Z",
   "warn_days": 30,
   "summary": { "error": 0, "expired": 1, "expiring": 0, "ok": 0 },
   "results": [
@@ -27,7 +28,6 @@ expirely prints this report when `--json` is set or stdout is not a terminal. Th
         "not_after": "2015-04-12T23:59:59Z",
         "dns_names": ["*.badssl.com", "badssl.com"]
       },
-      "chain": ["..."],
       "error": null
     }
   ]
@@ -38,6 +38,7 @@ expirely prints this report when `--json` is set or stdout is not a terminal. Th
 
 | Field | Meaning |
 |---|---|
+| `schema_version` | The version of this format, `1`. It changes when a field is removed or changes meaning, not when one is added |
 | `scanned_at` | When the scan ran, RFC 3339 in UTC |
 | `warn_days` | The `--warn-days` value used |
 | `summary` | Count of targets per status: `ok`, `expiring`, `expired`, `error` |
@@ -57,7 +58,7 @@ A field that could not be read is `null`, never zero or a default date.
 | `trust_issue` | Why the chain does not verify, as one of the values below; `null` when it does or on error |
 | `verify_error` | The full verification error; `null` when the chain verifies or on error |
 | `leaf` | The leaf certificate; `null` on error |
-| `chain` | Every certificate the server sent, leaf first; `null` on error |
+| `chain` | Every certificate the server sent, leaf first. Present only with `--details`, and `null` on error |
 | `error` | `{"code","reason","message"}` when the target could not be read; `null` otherwise |
 
 ## Trust issues
@@ -76,7 +77,7 @@ A field that could not be read is `null`, never zero or a default date.
 
 ## Certificate
 
-`leaf` and each entry of `chain` have these fields:
+`leaf` and each entry of `chain` have these fields. The chain is most of a report's size, so it is left out unless `--details` asks for it:
 
 | Field | Meaning |
 |---|---|

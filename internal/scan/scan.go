@@ -63,11 +63,13 @@ type Finding struct {
 	Trusted   *bool      `json:"trusted"`
 	// TrustIssue names why the chain does not verify, one of the Trust
 	// constants; it is nil when the chain verifies or on error.
-	TrustIssue  *string       `json:"trust_issue"`
-	VerifyError *string       `json:"verify_error"`
-	Leaf        *Cert         `json:"leaf"`
-	Chain       []Cert        `json:"chain"`
-	Error       *FindingError `json:"error"`
+	TrustIssue  *string `json:"trust_issue"`
+	VerifyError *string `json:"verify_error"`
+	Leaf        *Cert   `json:"leaf"`
+	// Chain is every certificate the server sent, leaf first. Reports
+	// leave it out unless asked for, since it is most of their size.
+	Chain []Cert        `json:"chain,omitempty"`
+	Error *FindingError `json:"error"`
 }
 
 // Prober reads the certificate chain of a target.

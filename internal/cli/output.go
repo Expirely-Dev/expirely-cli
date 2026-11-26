@@ -17,13 +17,26 @@ import (
 // report is the JSON document a scan prints; its field names are part of
 // the public contract.
 type report struct {
-	ScannedAt time.Time      `json:"scanned_at"`
-	WarnDays  int            `json:"warn_days"`
-	Summary   map[string]int `json:"summary"`
-	Results   []scan.Finding `json:"results"`
+	SchemaVersion int            `json:"schema_version"`
+	ScannedAt     time.Time      `json:"scanned_at"`
+	WarnDays      int            `json:"warn_days"`
+	Summary       map[string]int `json:"summary"`
+	Results       []scan.Finding `json:"results"`
 }
 
-func newReport(now time.Time, warnDays int, findings []scan.Finding) report {
+// schemaVersion is the version of the JSON report. It changes when a field
+// is removed or changes meaning; adding a field keeps it.
+const schemaVersion = 1
+
+// newReport builds the report for findings. Without details, each result
+// leaves out its certificate chain and keeps the leaf.
+func newReport(now time.Time, warnDays int, findings []scan.Finding, details bool) report {
+	if !details {
+		findings = slices.Clone(findings)
+		for i := range findings {
+			findings[i].Chain = nil
+		}
+	}
 	summary := map[string]int{
 		string(scan.StatusOK):       0,
 		string(scan.StatusExpiring): 0,
@@ -33,7 +46,7 @@ func newReport(now time.Time, warnDays int, findings []scan.Finding) report {
 	for _, f := range findings {
 		summary[string(f.Status)]++
 	}
-	return report{ScannedAt: now.UTC(), WarnDays: warnDays, Summary: summary, Results: findings}
+	return report{SchemaVersion: schemaVersion, ScannedAt: now.UTC(), WarnDays: warnDays, Summary: summary, Results: findings}
 }
 
 func fail(s Streams, jsonOut bool, e *Error) int {

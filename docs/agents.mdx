@@ -17,7 +17,7 @@ expirely -f targets.txt | jq '.summary'
 { "error": 0, "expired": 1, "expiring": 0, "ok": 3 }
 ```
 
-Every field is described in [Output](/reference/output). A value that could not be read is `null`, never zero or a default date.
+Every field is described in [Output](/reference/output). A value that could not be read is `null`, never zero or a default date. The report starts with `summary`, so an agent that reads only the first lines of a long scan still sees the counts, and it leaves each certificate chain out unless `--details` asks for it, which keeps a report of six targets near 3 KB instead of 7 KB.
 
 ## Agents on a terminal
 
