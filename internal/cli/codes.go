@@ -6,18 +6,18 @@ import "fmt"
 // them, so a code is never renamed or reused for a different failure. Every
 // code is listed in the README.
 const (
-	CodeInvalidFlag        = "invalid_flag"
-	CodeUnexpectedArgument = "unexpected_argument"
-	CodeMissingArguments   = "missing_arguments"
-	CodeOutputFailed       = "output_failed"
+	CodeInvalidFlag      = "invalid_flag"
+	CodeInvalidTarget    = "invalid_target"
+	CodeMissingArguments = "missing_arguments"
+	CodeOutputFailed     = "output_failed"
 )
 
 // errorCodes maps every error code to the exit code Run returns for it.
 var errorCodes = map[string]int{
-	CodeInvalidFlag:        ExitUsage,
-	CodeUnexpectedArgument: ExitUsage,
-	CodeMissingArguments:   ExitUsage,
-	CodeOutputFailed:       ExitFailure,
+	CodeInvalidFlag:      ExitUsage,
+	CodeInvalidTarget:    ExitUsage,
+	CodeMissingArguments: ExitUsage,
+	CodeOutputFailed:     ExitFailure,
 }
 
 // Error is a command failure with a stable Code from errorCodes and a

@@ -8,22 +8,27 @@ package cli
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"runtime/debug"
 	"slices"
+	"time"
+
+	"github.com/bycavii/expirely-cli/internal/probe"
+	"github.com/bycavii/expirely-cli/internal/scan"
+	"github.com/bycavii/expirely-cli/internal/target"
 )
 
-// Exit codes returned by Run. ExitUsage covers flags and arguments the
-// command does not accept; ExitFailure covers a command that was valid but
-// could not finish, such as a failed write to stdout.
+// Exit codes returned by Run, in order of precedence when a scan has
+// several outcomes: ExitFindings when any certificate is expired or
+// expiring, then ExitFailure when any target could not be read.
 const (
-	ExitOK      = 0
-	ExitUsage   = 2
-	ExitFailure = 3
+	ExitOK       = 0
+	ExitFindings = 1
+	ExitUsage    = 2
+	ExitFailure  = 3
 )
 
 // Streams holds the standard streams Run reads from and writes to.
@@ -35,27 +40,41 @@ type Streams struct {
 	StdoutIsTerminal bool
 }
 
-const usage = `Usage: expirely [flags]
+const (
+	defaultWarnDays = 30
+	defaultTimeout  = 10 * time.Second
+)
+
+const usage = `Usage: expirely [flags] TARGET...
 
 Find every TLS certificate you serve and when it expires.
 
+TARGET is host, host:port, [ipv6]:port or an https:// URL; the port
+defaults to 443.
+
 Flags:
-  -h, --help     show this help
-      --json     print JSON; the default when stdout is not a terminal
-      --version  print the version
+  -h, --help             show this help
+      --json             print JSON; the default when stdout is not a terminal
+      --timeout DURATION time allowed per target to connect and handshake (default 10s)
+      --version          print the version
+      --warn-days N      report certificates expiring within N days (default 30)
+
+Exit codes: 0 all ok, 1 a certificate is expired or expiring,
+2 usage error, 3 a target could not be read.
 `
 
 // Run executes expirely with args, which exclude the program name, and
 // returns the exit code. Help goes to stdout and exits ExitOK; errors go to
 // stderr and exit with the code errorCodes assigns to them.
 func Run(ctx context.Context, args []string, s Streams) int {
-	_ = ctx
 	jsonOut := !s.StdoutIsTerminal || wantsJSON(args)
 
 	fs := flag.NewFlagSet("expirely", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	showVersion := fs.Bool("version", false, "")
 	fs.Bool("json", false, "")
+	warnDays := fs.Int("warn-days", defaultWarnDays, "")
+	timeout := fs.Duration("timeout", defaultTimeout, "")
 
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -65,19 +84,57 @@ func Run(ctx context.Context, args []string, s Streams) int {
 		return fail(s, jsonOut, failf(CodeInvalidFlag, "%v", err))
 	}
 
-	if fs.NArg() > 0 {
-		return fail(s, jsonOut, failf(CodeUnexpectedArgument, "unexpected argument %q", fs.Arg(0)))
-	}
-
 	if *showVersion {
-		if jsonOut {
-			return writeJSON(s, jsonOut, map[string]string{"version": version()})
-		}
-		fmt.Fprintf(s.Stdout, "expirely %s\n", version())
-		return ExitOK
+		return printVersion(s, jsonOut)
+	}
+	if *warnDays < 0 {
+		return fail(s, jsonOut, failf(CodeInvalidFlag, "--warn-days must be 0 or more, got %d", *warnDays))
+	}
+	if *timeout <= 0 {
+		return fail(s, jsonOut, failf(CodeInvalidFlag, "--timeout must be positive, got %s", *timeout))
+	}
+	if fs.NArg() == 0 {
+		return fail(s, jsonOut, failf(CodeMissingArguments, "no targets: pass at least one host, host:port or https:// URL"))
 	}
 
-	return fail(s, jsonOut, failf(CodeMissingArguments, "nothing to do: pass a flag"))
+	targets := make([]target.Target, 0, fs.NArg())
+	for _, arg := range fs.Args() {
+		t, err := target.Parse(arg)
+		if err != nil {
+			return fail(s, jsonOut, failf(CodeInvalidTarget, "%v", err))
+		}
+		targets = append(targets, t)
+	}
+
+	now := time.Now()
+	findings := scan.Scan(ctx, probe.Prober{}, targets, scan.Options{
+		Warn:    time.Duration(*warnDays) * 24 * time.Hour,
+		Timeout: *timeout,
+		Now:     now,
+	})
+
+	report := newReport(now, *warnDays, findings)
+	if jsonOut {
+		if code := writeJSON(s, jsonOut, report); code != ExitOK {
+			return code
+		}
+	} else {
+		writeText(s.Stdout, report)
+	}
+	return exitCode(findings)
+}
+
+func exitCode(findings []scan.Finding) int {
+	code := ExitOK
+	for _, f := range findings {
+		switch f.Status {
+		case scan.StatusExpired, scan.StatusExpiring:
+			return ExitFindings
+		case scan.StatusError:
+			code = ExitFailure
+		}
+	}
+	return code
 }
 
 // wantsJSON reports whether args request JSON, read before flag parsing so
@@ -88,26 +145,11 @@ func wantsJSON(args []string) bool {
 	})
 }
 
-func fail(s Streams, jsonOut bool, e *Error) int {
-	code := errorCodes[e.Code]
+func printVersion(s Streams, jsonOut bool) int {
 	if jsonOut {
-		body := map[string]map[string]string{"error": {"message": e.Message, "code": e.Code}}
-		if err := json.NewEncoder(s.Stderr).Encode(body); err != nil {
-			fmt.Fprintf(s.Stderr, "expirely: %s (%s)\n", e.Message, e.Code)
-		}
-		return code
+		return writeJSON(s, jsonOut, map[string]string{"version": version()})
 	}
-	fmt.Fprintf(s.Stderr, "expirely: %s\n", e.Message)
-	if code == ExitUsage {
-		fmt.Fprintf(s.Stderr, "\n%s", usage)
-	}
-	return code
-}
-
-func writeJSON(s Streams, jsonOut bool, v any) int {
-	if err := json.NewEncoder(s.Stdout).Encode(v); err != nil {
-		return fail(s, jsonOut, failf(CodeOutputFailed, "write output: %v", err))
-	}
+	fmt.Fprintf(s.Stdout, "expirely %s\n", version())
 	return ExitOK
 }
 
