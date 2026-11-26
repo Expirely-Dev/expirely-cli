@@ -13,6 +13,17 @@ const (
 	CodeOutputFailed     = "output_failed"
 )
 
+// remediations says, for every error code, what resolves it. They are
+// declarative and never repeat what the user typed: an agent reads them as
+// facts about the tool, not as instructions from it.
+var remediations = map[string]string{
+	CodeInvalidFlag:      "expirely --help lists every flag and the values it accepts.",
+	CodeInvalidTarget:    "A target is host, host:port, [ipv6]:port or https://host/path; the port defaults to 443.",
+	CodeMissingArguments: "Targets come as arguments, such as expirely example.com, or one per line from --file.",
+	CodeFileUnreadable:   "A --file needs to exist, be readable and hold one target per line of at most 64 KiB; - reads stdin.",
+	CodeOutputFailed:     "The reader of stdout closed before the output ended, as a pipe to head does; the scan itself finished.",
+}
+
 // errorCodes maps every error code to the exit code Run returns for it.
 var errorCodes = map[string]int{
 	CodeInvalidFlag:      ExitUsage,

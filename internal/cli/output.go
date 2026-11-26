@@ -49,19 +49,30 @@ func newReport(now time.Time, warnDays int, findings []scan.Finding, details boo
 	return report{SchemaVersion: schemaVersion, ScannedAt: now.UTC(), WarnDays: warnDays, Summary: summary, Results: findings}
 }
 
+// envelope is the JSON a command error prints on stderr.
+type envelope struct {
+	Error struct {
+		Code        string `json:"code"`
+		Message     string `json:"message"`
+		Remediation string `json:"remediation"`
+	} `json:"error"`
+}
+
+// fail prints e and returns its exit code. In JSON it prints the envelope;
+// in text it prints the message and, on the next line, what resolves it.
 func fail(s Streams, jsonOut bool, e *Error) int {
 	code := errorCodes[e.Code]
 	if jsonOut {
-		body := map[string]map[string]string{"error": {"message": e.Message, "code": e.Code}}
+		var body envelope
+		body.Error.Code = e.Code
+		body.Error.Message = e.Message
+		body.Error.Remediation = remediations[e.Code]
 		if err := json.NewEncoder(s.Stderr).Encode(body); err != nil {
 			fmt.Fprintf(s.Stderr, "expirely: %s (%s)\n", e.Message, e.Code)
 		}
 		return code
 	}
-	fmt.Fprintf(s.Stderr, "expirely: %s\n", ui.Clean(e.Message))
-	if code == ExitUsage {
-		fmt.Fprintln(s.Stderr, "Run expirely --help to see every flag.")
-	}
+	fmt.Fprintf(s.Stderr, "expirely: %s\n%s\n", ui.Clean(e.Message), remediations[e.Code])
 	return code
 }
 

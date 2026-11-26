@@ -150,6 +150,9 @@ func TestScan(t *testing.T) {
 		if f.Error == nil || f.Error.Code != w.code {
 			t.Errorf("findings[%d].Error = %+v, want code %q", i, f.Error, w.code)
 		}
+		if f.Error != nil && f.Error.Remediation != Remediations[w.code] {
+			t.Errorf("findings[%d].Error.Remediation = %q, want the one for %q", i, f.Error.Remediation, w.code)
+		}
 		if f.DaysLeft != nil || f.Leaf != nil || f.Trusted != nil {
 			t.Errorf("findings[%d] error finding has certificate fields: %+v", i, f)
 		}

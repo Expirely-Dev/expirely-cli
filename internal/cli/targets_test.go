@@ -106,7 +106,7 @@ func TestRunFlagValidation(t *testing.T) {
 		wantErr string
 	}{
 		{name: "concurrency below one", args: []string{"--concurrency", "0", "a.example"}, wantErr: "--concurrency must be 1 or more, got 0"},
-		{name: "empty file and no arguments", args: []string{"-f", "-"}, wantErr: "expirely: no targets in stdin\nRun expirely --help"},
+		{name: "empty file and no arguments", args: []string{"-f", "-"}, wantErr: "expirely: no targets in stdin\nTargets come as arguments"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

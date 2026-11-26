@@ -42,11 +42,19 @@ type Cert struct {
 }
 
 // FindingError is why a target could not be read. Reason says it in a few
-// words for a person; Message is the full error.
+// words for a person; Message is the full error; Remediation says what
+// resolves it, as facts rather than instructions.
 type FindingError struct {
-	Code    string `json:"code"`
-	Reason  string `json:"reason"`
-	Message string `json:"message"`
+	Code        string `json:"code"`
+	Reason      string `json:"reason"`
+	Message     string `json:"message"`
+	Remediation string `json:"remediation"`
+}
+
+// Remediations says, for each result error code, what resolves it.
+var Remediations = map[string]string{
+	CodeDialFailed:      "A wrong host or port, a host that is down, or a firewall between this network and the host causes this; reason says which.",
+	CodeHandshakeFailed: "The port accepted a connection but did not complete TLS; it may serve plain HTTP, need another port or reject this client; reason says which.",
 }
 
 // Finding is the result for one target. When Status is StatusError, Error
@@ -194,6 +202,6 @@ func errorFinding(t target.Target, err error) Finding {
 	return Finding{
 		Target: t.String(),
 		Status: StatusError,
-		Error:  &FindingError{Code: code, Reason: reason(err), Message: err.Error()},
+		Error:  &FindingError{Code: code, Reason: reason(err), Message: err.Error(), Remediation: Remediations[code]},
 	}
 }

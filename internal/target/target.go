@@ -69,7 +69,7 @@ func parseURL(input, s string) (Target, error) {
 		return Target{}, &ParseError{Input: input, Reason: "not a URL"}
 	}
 	if !strings.EqualFold(u.Scheme, "https") {
-		return Target{}, &ParseError{Input: input, Reason: fmt.Sprintf("scheme %q does not use TLS; use https://", u.Scheme)}
+		return Target{}, &ParseError{Input: input, Reason: fmt.Sprintf("scheme %q does not use TLS; only https:// does", u.Scheme)}
 	}
 	if u.User != nil {
 		return Target{}, &ParseError{Input: input, Reason: "credentials in the URL are not accepted"}

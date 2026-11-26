@@ -59,7 +59,7 @@ A field that could not be read is `null`, never zero or a default date.
 | `verify_error` | The full verification error; `null` when the chain verifies or on error |
 | `leaf` | The leaf certificate; `null` on error |
 | `chain` | Every certificate the server sent, leaf first. Present only with `--details`, and `null` on error |
-| `error` | `{"code","reason","message"}` when the target could not be read; `null` otherwise |
+| `error` | `{"code","reason","message","remediation"}` when the target could not be read; `null` otherwise |
 
 ## Trust issues
 
@@ -73,7 +73,7 @@ A field that could not be read is `null`, never zero or a default date.
 
 ## Errors of a result
 
-`error.code` is `dial_failed` or `handshake_failed`, listed in [Error codes](/reference/error-codes). `error.reason` says why in a few words, such as `connection refused`, `no such host`, `timed out`, `not a TLS server` or `no certificate sent`; it is for people and can change. `error.message` is the full error.
+`error.code` is `dial_failed` or `handshake_failed`, listed in [Error codes](/reference/error-codes). `error.reason` says why in a few words, such as `connection refused`, `no such host`, `timed out`, `not a TLS server` or `no certificate sent`; it is for people and can change. `error.message` is the full error. `error.remediation` says what resolves it.
 
 ## Certificate
 
@@ -93,7 +93,7 @@ A field that could not be read is `null`, never zero or a default date.
 `--version` prints `{"version":"..."}`. A command error prints one line on stderr, the error envelope:
 
 ```json
-{"error":{"code":"invalid_flag","message":"unknown flag --nope"}}
+{"error":{"code":"invalid_flag","message":"unknown flag --nope","remediation":"expirely --help lists every flag and the values it accepts."}}
 ```
 
 Its codes are in [Error codes](/reference/error-codes).

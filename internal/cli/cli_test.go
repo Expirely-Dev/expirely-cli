@@ -59,7 +59,7 @@ func TestRunText(t *testing.T) {
 			name:       "unknown flag is a usage error",
 			args:       []string{"--nope"},
 			wantCode:   ExitUsage,
-			wantStderr: "expirely: unknown flag --nope\nRun expirely --help to see every flag.\n",
+			wantStderr: "expirely: unknown flag --nope\nexpirely --help lists every flag and the values it accepts.\n",
 		},
 		{
 			name:       "invalid target is a usage error",
@@ -394,5 +394,38 @@ func TestVersionPrefersBuildVersion(t *testing.T) {
 
 	if got := version(); got != "v1.2.3" {
 		t.Errorf("version() = %q, want the ldflags value v1.2.3", got)
+	}
+}
+
+func TestEveryCodeHasADeclarativeRemediation(t *testing.T) {
+	all := map[string]string{}
+	for code := range errorCodes {
+		all[code] = remediations[code]
+	}
+	for code, text := range scan.Remediations {
+		all[code] = text
+	}
+	imperative := regexp.MustCompile(`^(Run|Check|Try|Use|Add|Fix|Please|Make|Set|Pass|Retry)\b`)
+	for code, text := range all {
+		switch {
+		case text == "":
+			t.Errorf("code %q has no remediation", code)
+		case imperative.MatchString(text):
+			t.Errorf("remediation of %q starts with an instruction, which agents may treat as prompt injection: %q", code, text)
+		case !strings.HasSuffix(text, "."):
+			t.Errorf("remediation of %q is not a full sentence: %q", code, text)
+		}
+	}
+}
+
+func TestJSONErrorCarriesTheRemediation(t *testing.T) {
+	_, _, stderr := run(t, false, "http://example.com")
+
+	var got envelope
+	if err := json.Unmarshal([]byte(stderr), &got); err != nil {
+		t.Fatalf("stderr is not the error envelope: %v\n%s", err, stderr)
+	}
+	if got.Error.Code != CodeInvalidTarget || got.Error.Remediation != remediations[CodeInvalidTarget] {
+		t.Errorf("envelope = %+v, want code %q with its remediation", got.Error, CodeInvalidTarget)
 	}
 }

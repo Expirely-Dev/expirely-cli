@@ -50,10 +50,10 @@ When a scan has both, `1` wins over `3`.
 A command error is one JSON line on stderr. A target that could not be read carries a `code` in its `error` field too, and a chain that does not verify names why in `trust_issue`:
 
 ```json
-{"error":{"code":"invalid_target","message":"invalid target \"http://example.com\": scheme \"http\" does not use TLS; use https://"}}
+{"error":{"code":"invalid_target","message":"invalid target \"http://example.com\": scheme \"http\" does not use TLS; only https:// does","remediation":"A target is host, host:port, [ipv6]:port or https://host/path; the port defaults to 443."}}
 ```
 
-Messages and reasons are for people and can change. Codes and `trust_issue` values are never renamed or reused; they are listed in [Error codes](/reference/error-codes) and [Output](/reference/output).
+Every error also carries a `remediation`: what resolves it, stated as a fact about the tool rather than an instruction, so an agent harness does not read it as prompt injection, and never repeating what was typed. Messages, reasons and remediations are for people and can change. Codes and `trust_issue` values are never renamed or reused; they are listed in [Error codes](/reference/error-codes) and [Output](/reference/output).
 
 ## Safe to run
 
