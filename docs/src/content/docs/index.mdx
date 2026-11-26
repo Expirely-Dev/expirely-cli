@@ -1,0 +1,20 @@
+---
+title: expirely
+description: Find every TLS certificate you serve and when it expires.
+template: splash
+hero:
+  tagline: Find every TLS certificate you serve and when it expires, before your users do.
+  actions:
+    - text: Get started
+      link: getting-started/introduction/
+      icon: right-arrow
+    - text: View on GitHub
+      link: https://github.com/bycavii/expirely-cli
+      icon: external
+      variant: minimal
+---
+
+```sh
+go install github.com/bycavii/expirely-cli/cmd/expirely@latest
+expirely example.com expired.badssl.com
+```

@@ -46,3 +46,11 @@ snapshot:
 # Build the binary into ./bin.
 build:
     go build -o bin/expirely ./cmd/expirely
+
+# Serve the docs site at http://localhost:4321/expirely-cli/; needs the Node version in docs/.node-version.
+docs:
+    cd docs && npm ci && npm run dev
+
+# Build the docs site into docs/dist, as the docs workflow does.
+docs-build:
+    cd docs && npm ci && npm run build
