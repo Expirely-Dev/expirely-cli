@@ -4,7 +4,7 @@ import "fmt"
 
 // Error codes are part of the public contract: scripts and agents match on
 // them, so a code is never renamed or reused for a different failure. Every
-// code is listed in docs/src/content/docs/reference/codes.mdx.
+// code is listed in docs/reference/error-codes.mdx.
 const (
 	CodeInvalidFlag      = "invalid_flag"
 	CodeInvalidTarget    = "invalid_target"

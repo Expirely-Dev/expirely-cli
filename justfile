@@ -1,6 +1,7 @@
 golangci := "go tool -modfile=tools/golangci-lint/go.mod golangci-lint"
 govulncheck := "go tool -modfile=tools/govulncheck/go.mod govulncheck"
 goreleaser := "go tool -modfile=tools/goreleaser/go.mod goreleaser"
+mint := "npx --yes mint@4.3.96"
 
 default:
     @just --list
@@ -47,10 +48,10 @@ snapshot:
 build:
     go build -o bin/expirely ./cmd/expirely
 
-# Serve the docs site at http://localhost:4321/expirely-cli/; needs the Node version in docs/.node-version.
+# Serve the docs at http://localhost:3000 with Mintlify; needs Node.js 18 or newer.
 docs:
-    cd docs && npm ci && npm run dev
+    cd docs && {{mint}} dev --telemetry=false
 
-# Build the docs site into docs/dist, as the docs workflow does.
-docs-build:
-    cd docs && npm ci && npm run build
+# Mintlify's checks of the docs: MDX, navigation and broken links; needs Node.js.
+docs-check:
+    cd docs && {{mint}} validate --telemetry=false && {{mint}} broken-links --telemetry=false

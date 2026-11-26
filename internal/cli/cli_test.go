@@ -322,28 +322,28 @@ func TestFailfRejectsUnknownCode(t *testing.T) {
 
 func readDoc(t *testing.T, name string) []byte {
 	t.Helper()
-	doc, err := os.ReadFile(filepath.Join("..", "..", "docs", "src", "content", "docs", "reference", name)) //nolint:gosec // G304: name is a fixed page name from the tests.
+	doc, err := os.ReadFile(filepath.Join("..", "..", "docs", name)) //nolint:gosec // G304: name is a fixed page name from the tests.
 	if err != nil {
-		t.Fatalf("read reference page: %v", err)
+		t.Fatalf("read docs page: %v", err)
 	}
 	return doc
 }
 
 func TestDocsListEveryCode(t *testing.T) {
-	doc := readDoc(t, "codes.mdx")
+	doc := readDoc(t, filepath.Join("reference", "error-codes.mdx"))
 	codes := []string{scan.CodeDialFailed, scan.CodeHandshakeFailed}
 	for code := range errorCodes {
 		codes = append(codes, code)
 	}
 	for _, code := range codes {
 		if !bytes.Contains(doc, []byte("| `"+code+"` |")) {
-			t.Errorf("reference/codes.mdx has no table row for code %q", code)
+			t.Errorf("docs/reference/error-codes.mdx has no table row for code %q", code)
 		}
 	}
 }
 
 func TestDocsListEveryFlag(t *testing.T) {
-	doc := readDoc(t, "cli.mdx")
+	doc := readDoc(t, filepath.Join("cli", "expirely.mdx"))
 	flags := regexp.MustCompile(`--[a-z][a-z-]*`).FindAllString(usage, -1)
 	if len(flags) == 0 {
 		t.Fatal("found no flags in the usage text")
@@ -351,7 +351,7 @@ func TestDocsListEveryFlag(t *testing.T) {
 	for _, f := range flags {
 		row := regexp.MustCompile("(?m)^\\|[^|\\n]*`" + regexp.QuoteMeta(f) + "[ `]")
 		if !row.Match(doc) {
-			t.Errorf("reference/cli.mdx has no table row for %s from the usage text", f)
+			t.Errorf("docs/cli/expirely.mdx has no table row for %s from the usage text", f)
 		}
 	}
 }

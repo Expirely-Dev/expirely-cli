@@ -1,10 +1,10 @@
 # AGENTS.md
 
-Rules for agents working in this repository. User documentation is the Starlight site in `docs/`; the README stays short and links to it. `expirely` is a read-only CLI: it inspects TLS certificates that other systems serve and reports when they expire.
+Rules for agents working in this repository. User documentation is the Mintlify site in `docs/` (`docs.json` holds the navigation); the README stays short and points to it. `expirely` is a read-only CLI: it inspects TLS certificates that other systems serve and reports when they expire.
 
 ## Contract
 
-- Exit codes, error codes, flags and JSON field names are a public contract that CI pipelines and agents parse. A change to any of them updates its page under `docs/src/content/docs/reference` in the same commit; tests in `internal/cli` fail when a code or a flag in the usage text is missing there.
+- Exit codes, error codes, flags and JSON field names are a public contract that CI pipelines and agents parse. A change to any of them updates `docs/cli/expirely.mdx` or its page under `docs/reference` in the same commit, and `just docs-check` passes; tests in `internal/cli` fail when a code or a flag in the usage text is missing there.
 - Results go to stdout and errors to stderr. Output is JSON when `--json` is set or stdout is not a terminal; text otherwise. In JSON, an error is `{"error":{"message":"...","code":"..."}}`.
 - Error codes are snake_case and live in one table in `internal/cli`; every error a command returns carries one of them.
 - A value the scan could not read is `null` in JSON and `unknown` in text, never zero or a default date.

@@ -1,9 +1,9 @@
 ---
-title: JSON output
-description: The fields of the report expirely prints with --json.
+title: Output
+description: The fields of the JSON report and the error envelope.
 ---
 
-Output of `expirely --json expired.badssl.com`, with `chain` shortened:
+expirely prints this report when `--json` is set or stdout is not a terminal. This is the output of `expirely --json expired.badssl.com`, with `chain` shortened:
 
 ```json
 {
@@ -73,4 +73,10 @@ A field that could not be read is `null`, never zero or a default date.
 
 ## Other output
 
-`--version` prints `{"version":"..."}`. A command error prints one line on stderr, described in [Exit and error codes](/expirely-cli/reference/codes/).
+`--version` prints `{"version":"..."}`. A command error prints one line on stderr, the error envelope:
+
+```json
+{"error":{"code":"invalid_flag","message":"flag provided but not defined: -nope"}}
+```
+
+Its codes are in [Error codes](/reference/error-codes).

@@ -1,0 +1,52 @@
+---
+title: Introduction
+description: Find every TLS certificate you serve and when it expires.
+---
+
+expirely connects to each target you give it, completes a TLS handshake, reads the certificate chain and closes the connection. It tells you which certificates are expired, which expire soon and which targets could not be read, in a table for people and in JSON for CI and AI agents.
+
+It sends no application data, holds no credentials and never touches a private key. Expired, untrusted and mismatched chains are read and reported, not refused.
+
+<Note>
+  expirely is in early development and has no release yet. Flags, JSON fields and codes can change until the first release.
+</Note>
+
+```
+$ expirely example.com expired.badssl.com self-signed.badssl.com wrong.host.badssl.com localhost:1
+TARGET                      STATUS   DAYS     EXPIRES               TRUSTED  DETAIL
+expired.badssl.com:443      expired  -4246    2015-04-12 23:59 UTC  no       issuer COMODO RSA Domain Validation Secure Server CA
+localhost:1                 error    unknown  unknown               unknown  dial localhost:1: dial tcp [::1]:1: connect: connection refused
+wrong.host.badssl.com:443   ok       31       2026-12-28 20:02 UTC  no       issuer YR1
+example.com:443             ok       88       2027-02-22 23:53 UTC  yes      issuer Cloudflare TLS Issuing ECC CA 3
+self-signed.badssl.com:443  ok       727      2028-11-23 21:00 UTC  no       issuer *.badssl.com
+
+5 targets: 1 expired, 0 expiring, 1 unreadable, 3 ok
+```
+
+## Get started
+
+<CardGroup cols={2}>
+  <Card title="Install" icon="download" href="/install">
+    One static binary, installed with Go.
+  </Card>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Scan your first targets in a minute.
+  </Card>
+  <Card title="AI agents and CI" icon="robot" href="/agents">
+    JSON by default outside a terminal, stable codes and exit codes.
+  </Card>
+  <Card title="Command line" icon="terminal" href="/cli/expirely">
+    Every flag and what each status means.
+  </Card>
+</CardGroup>
+
+## Guides
+
+<CardGroup cols={2}>
+  <Card title="Scan targets" icon="list" href="/guides/targets">
+    Arguments, files, stdin and output from other commands.
+  </Card>
+  <Card title="Gate CI and alert from cron" icon="bell" href="/guides/ci">
+    Fail a pipeline or raise an alert before a certificate expires.
+  </Card>
+</CardGroup>

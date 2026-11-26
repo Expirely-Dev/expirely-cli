@@ -1,0 +1,27 @@
+---
+title: Install expirely
+sidebarTitle: Install
+description: Install expirely with Go or build it from source.
+---
+
+expirely is one static binary for Linux, macOS and Windows. It needs no server, no configuration and no credentials.
+
+## With Go
+
+With Go 1.27 or newer:
+
+```sh
+go install github.com/bycavii/expirely-cli/cmd/expirely@latest
+expirely --version
+```
+
+`go install` puts the binary in `$(go env GOPATH)/bin`. Add that directory to your `PATH` if `expirely` is not found. To install a specific version, replace `latest` with a tag such as `v0.1.0`.
+
+## From source
+
+```sh
+git clone https://github.com/bycavii/expirely-cli.git
+cd expirely-cli
+go build -o expirely ./cmd/expirely
+./expirely example.com
+```

@@ -1,0 +1,79 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "almond",
+  "name": "expirely",
+  "description": "Find every TLS certificate you serve and when it expires.",
+  "colors": {
+    "primary": "#C2410C",
+    "light": "#FB923C",
+    "dark": "#9A3412"
+  },
+  "favicon": "/favicon.svg",
+  "styling": {
+    "codeblocks": {
+      "theme": {
+        "light": "github-light",
+        "dark": "vesper"
+      }
+    }
+  },
+  "contextual": {
+    "options": [
+      "copy",
+      "view"
+    ]
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "icon": "book-open",
+        "groups": [
+          {
+            "group": "Get started",
+            "pages": [
+              "introduction",
+              "install",
+              "quickstart",
+              "agents"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/targets",
+              "guides/ci"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "CLI reference",
+        "icon": "terminal",
+        "groups": [
+          {
+            "group": "Command",
+            "pages": [
+              "cli/expirely"
+            ]
+          },
+          {
+            "group": "Output and errors",
+            "pages": [
+              "reference/output",
+              "reference/error-codes"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "GitHub",
+        "href": "https://github.com/bycavii/expirely-cli"
+      }
+    ]
+  }
+}

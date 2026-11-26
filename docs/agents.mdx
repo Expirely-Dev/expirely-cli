@@ -1,0 +1,45 @@
+---
+title: AI agents and CI
+description: JSON outside a terminal, stable codes and exit codes a program can act on.
+---
+
+expirely is built to be run by a program as much as by a person. An agent or a pipeline needs no flag to get machine-readable output, and every outcome has a code that does not change.
+
+## JSON without asking
+
+When stdout is not a terminal, such as a pipe, a file or a CI log, expirely prints the JSON report. `--json` forces it in a terminal too.
+
+```sh
+expirely -f targets.txt | jq '.summary'
+```
+
+```json
+{ "error": 0, "expired": 1, "expiring": 0, "ok": 3 }
+```
+
+Every field is described in [Output](/reference/output). A value that could not be read is `null`, never zero or a default date.
+
+## Decide on the exit code
+
+| Exit | What to do                                                    |
+| ---- | ------------------------------------------------------------- |
+| `0`  | Nothing: every target is `ok`                                 |
+| `1`  | Renew: a certificate is `expired` or `expiring`               |
+| `2`  | Fix the command: a flag, a target or a `--file` is wrong      |
+| `3`  | Look at the network: a target could not be read               |
+
+When a scan has both, `1` wins over `3`.
+
+## Match on codes, not messages
+
+A command error is one JSON line on stderr, and a target that could not be read carries the same shape in its `error` field:
+
+```json
+{"error":{"code":"invalid_target","message":"invalid target \"http://example.com\": scheme \"http\" does not use TLS; use https://"}}
+```
+
+Messages are for people and can change. Codes are never renamed or reused; they are listed in [Error codes](/reference/error-codes).
+
+## Safe to run
+
+expirely only reads. It completes a TLS handshake and closes the connection, sends no application data and no credentials, and removes control characters from text taken from certificates before printing it in a terminal.

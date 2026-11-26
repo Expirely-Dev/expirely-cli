@@ -14,16 +14,16 @@ just fuzz       # fuzz the target parser for 60s (just fuzz 5m for longer)
 just build      # build ./bin/expirely
 ```
 
-The documentation site needs the Node.js version in `docs/.node-version`:
+The documentation is a Mintlify site in `docs`, and needs Node.js 18 or newer:
 
 ```sh
-just docs         # http://localhost:4321/expirely-cli/
-just docs-build   # build docs/dist as the docs workflow does
+just docs         # http://localhost:3000
+just docs-check   # MDX, navigation and broken links, as the docs workflow runs
 ```
 
 ## Pull requests
 
-Titles follow Conventional Commits: `<type>(<scope>): <summary>`, imperative, lowercase, at most 72 characters. A change to a flag, a JSON field, an exit code or an error code updates its page under `docs/src/content/docs/reference` in the same pull request.
+Titles follow Conventional Commits: `<type>(<scope>): <summary>`, imperative, lowercase, at most 72 characters. A change to a flag, a JSON field, an exit code or an error code updates `docs/cli/expirely.mdx` or its page under `docs/reference` in the same pull request.
 
 ## Release
 

@@ -27,7 +27,13 @@ go install github.com/bycavii/expirely-cli/cmd/expirely@latest
 
 ## Documentation
 
-The documentation is at [bycavii.github.io/expirely-cli](https://bycavii.github.io/expirely-cli/). It covers targets and files, CI usage, every flag, the JSON output and every exit and error code. Its sources live in [`docs`](docs) and run locally with `just docs`.
+The documentation lives in [`docs`](docs) and runs locally with [just](https://github.com/casey/just) and Node.js 18 or newer:
+
+```sh
+just docs   # http://localhost:3000
+```
+
+It covers targets and files, CI and cron, every flag, the JSON output and every exit and error code.
 
 ## Contributing
 

@@ -1,0 +1,39 @@
+---
+title: Quickstart
+description: Scan your first targets and read the result in a minute.
+---
+
+<Steps>
+  <Step title="Install">
+    ```sh
+    go install github.com/bycavii/expirely-cli/cmd/expirely@latest
+    ```
+  </Step>
+  <Step title="Scan a host">
+    ```sh
+    expirely example.com
+    ```
+
+    Each row is one target. `STATUS` is `ok`, `expiring`, `expired` or `error`; `DAYS` counts whole days until the first certificate in the chain expires; `TRUSTED` says whether the chain verifies against the system roots.
+  </Step>
+  <Step title="Scan a list">
+    Put one target per line in a file; blank lines and lines starting with `#` are skipped:
+
+    ```text targets.txt
+    # production
+    example.com
+    api.example.com:8443
+    ```
+
+    ```sh
+    expirely -f targets.txt --warn-days 21
+    ```
+  </Step>
+  <Step title="Act on the exit code">
+    ```sh
+    expirely -f targets.txt || echo "a certificate needs attention"
+    ```
+
+    The exit code is `1` when a certificate is expired or expires within `--warn-days`, and `3` when a target could not be read. [Gate CI and alert from cron](/guides/ci) builds on it.
+  </Step>
+</Steps>
