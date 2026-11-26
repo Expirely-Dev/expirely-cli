@@ -2,7 +2,7 @@
 
 Every release of expirely, newest first. Until 1.0, a release can change flags, JSON fields and codes; each change that does is under **Breaking**, with what to do.
 
-## Unreleased
+## v0.2.0 - 2026-11-26
 
 ### Added
 
