@@ -1,0 +1,51 @@
+---
+title: Gate CI and alert from cron
+description: Fail a pipeline or raise an alert when a certificate expires soon.
+---
+
+expirely exits with 1 when any certificate is expired or expires within `--warn-days`, with 3 when a target could not be read, and with 0 otherwise. Any runner that stops on a non-zero exit code can use it as a gate.
+
+## GitHub Actions
+
+```yaml title=".github/workflows/certificates.yml"
+name: certificates
+
+on:
+  schedule:
+    - cron: "0 8 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  expiry:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version: "1.27"
+      - run: go install github.com/bycavii/expirely-cli/cmd/expirely@v0.1.0
+      - run: expirely -f targets.txt --warn-days 21
+```
+
+Outside a terminal expirely prints JSON, so the job log carries the full report. Add `--json=false` for the table.
+
+## Cron
+
+```sh
+expirely -f /etc/expirely/targets.txt --warn-days 14 > /var/log/expirely.json
+case $? in
+  1) echo "a certificate expires within 14 days" | mail -s "certificates" ops@example.com ;;
+  3) echo "a target could not be read" | mail -s "certificates" ops@example.com ;;
+esac
+```
+
+## Pick what to act on
+
+```sh
+expirely --json -f targets.txt | jq -r '.results[] | select(.status == "expiring" or .status == "expired") | "\(.target) \(.days_left)"'
+```
+
+The fields are listed in [JSON output](/expirely-cli/reference/json/).

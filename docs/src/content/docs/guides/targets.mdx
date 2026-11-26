@@ -1,0 +1,52 @@
+---
+title: Scan targets
+description: Give expirely targets as arguments, from files or from another command.
+---
+
+## As arguments
+
+```sh
+expirely example.com api.example.com:8443 https://intranet.example.com/login [2001:db8::1]:443
+```
+
+A target is a host, `host:port`, `[ipv6]:port`, a bare IP address or an `https://` URL. The port defaults to 443, and the path, query and fragment of a URL are ignored. These are rejected before anything is scanned:
+
+- a scheme other than `https://`, because it does not use TLS;
+- a username or password in a URL;
+- a port outside 1-65535;
+- a host with characters other than letters, digits, `-`, `_` and `.`.
+
+## From a file
+
+```text title="targets.txt"
+# production
+example.com
+api.example.com:8443
+
+# staging
+https://staging.example.com
+```
+
+```sh
+expirely -f targets.txt
+```
+
+A file has one target per line; blank lines and lines starting with `#` are skipped. `--file` is repeatable, and `-` reads stdin. An invalid line stops the command before any scan and names the file and the line, such as `targets.txt:7`.
+
+## From another command
+
+```sh
+kubectl get ingress -A -o jsonpath='{range .items[*].spec.tls[*].hosts[*]}{@}{"\n"}{end}' | expirely -f -
+```
+
+## Order and repeats
+
+Targets from arguments come first, then each file in the order given. A target that appears twice is scanned once, at its first position. JSON output keeps this order; the text table lists the most urgent targets first.
+
+## Many targets
+
+expirely scans 16 targets at once by default and gives each 10 seconds to connect and complete the handshake. Raise `--concurrency` for long lists and lower `--timeout` for networks where a slow target is already a problem:
+
+```sh
+expirely -f targets.txt --concurrency 64 --timeout 3s
+```

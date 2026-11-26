@@ -22,6 +22,21 @@ export default defineConfig({
             { label: 'Install', slug: 'getting-started/install' },
           ],
         },
+        {
+          label: 'Guides',
+          items: [
+            { label: 'Scan targets', slug: 'guides/targets' },
+            { label: 'Gate CI and alert from cron', slug: 'guides/ci' },
+          ],
+        },
+        {
+          label: 'Reference',
+          items: [
+            { label: 'Command line', slug: 'reference/cli' },
+            { label: 'JSON output', slug: 'reference/json' },
+            { label: 'Exit and error codes', slug: 'reference/codes' },
+          ],
+        },
       ],
     }),
   ],

@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -318,18 +320,38 @@ func TestFailfRejectsUnknownCode(t *testing.T) {
 	_ = failf("no_such_code", "x")
 }
 
-func TestReadmeListsEveryCode(t *testing.T) {
-	readme, err := os.ReadFile("../../README.md")
+func readDoc(t *testing.T, name string) []byte {
+	t.Helper()
+	doc, err := os.ReadFile(filepath.Join("..", "..", "docs", "src", "content", "docs", "reference", name)) //nolint:gosec // G304: name is a fixed page name from the tests.
 	if err != nil {
-		t.Fatalf("read README: %v", err)
+		t.Fatalf("read reference page: %v", err)
 	}
+	return doc
+}
+
+func TestDocsListEveryCode(t *testing.T) {
+	doc := readDoc(t, "codes.mdx")
 	codes := []string{scan.CodeDialFailed, scan.CodeHandshakeFailed}
 	for code := range errorCodes {
 		codes = append(codes, code)
 	}
 	for _, code := range codes {
-		if !bytes.Contains(readme, []byte("| `"+code+"` |")) {
-			t.Errorf("README has no table row for code %q", code)
+		if !bytes.Contains(doc, []byte("| `"+code+"` |")) {
+			t.Errorf("reference/codes.mdx has no table row for code %q", code)
+		}
+	}
+}
+
+func TestDocsListEveryFlag(t *testing.T) {
+	doc := readDoc(t, "cli.mdx")
+	flags := regexp.MustCompile(`--[a-z][a-z-]*`).FindAllString(usage, -1)
+	if len(flags) == 0 {
+		t.Fatal("found no flags in the usage text")
+	}
+	for _, f := range flags {
+		row := regexp.MustCompile("(?m)^\\|[^|\\n]*`" + regexp.QuoteMeta(f) + "[ `]")
+		if !row.Match(doc) {
+			t.Errorf("reference/cli.mdx has no table row for %s from the usage text", f)
 		}
 	}
 }

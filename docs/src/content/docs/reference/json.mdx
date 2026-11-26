@@ -1,0 +1,76 @@
+---
+title: JSON output
+description: The fields of the report expirely prints with --json.
+---
+
+Output of `expirely --json expired.badssl.com`, with `chain` shortened:
+
+```json
+{
+  "scanned_at": "2026-11-26T22:34:41.357344Z",
+  "warn_days": 30,
+  "summary": { "error": 0, "expired": 1, "expiring": 0, "ok": 0 },
+  "results": [
+    {
+      "target": "expired.badssl.com:443",
+      "status": "expired",
+      "days_left": -4246,
+      "expires_at": "2015-04-12T23:59:59Z",
+      "trusted": false,
+      "verify_error": "x509: certificate has expired or is not yet valid: “*.badssl.com” certificate is expired",
+      "leaf": {
+        "subject": "CN=*.badssl.com,OU=Domain Control Validated+OU=PositiveSSL Wildcard",
+        "issuer": "CN=COMODO RSA Domain Validation Secure Server CA,O=COMODO CA Limited,L=Salford,ST=Greater Manchester,C=GB",
+        "serial": "4ae79549fa9abe3f100f17a478e16909",
+        "not_before": "2015-04-09T00:00:00Z",
+        "not_after": "2015-04-12T23:59:59Z",
+        "dns_names": ["*.badssl.com", "badssl.com"]
+      },
+      "chain": ["..."],
+      "error": null
+    }
+  ]
+}
+```
+
+## Report
+
+| Field | Meaning |
+|---|---|
+| `scanned_at` | When the scan ran, RFC 3339 in UTC |
+| `warn_days` | The `--warn-days` value used |
+| `summary` | Count of targets per status: `ok`, `expiring`, `expired`, `error` |
+| `results` | One entry per target, in the order the targets were given |
+
+## Result
+
+A field that could not be read is `null`, never zero or a default date.
+
+| Field | Meaning |
+|---|---|
+| `target` | `host:port` as scanned |
+| `status` | `ok`, `expiring`, `expired` or `error` |
+| `days_left` | Whole days until `expires_at`, negative once expired; `null` on error |
+| `expires_at` | The earliest `NotAfter` in the chain; `null` on error |
+| `trusted` | Whether the chain verifies for the host against the system roots; `null` on error |
+| `verify_error` | Why the chain does not verify; `null` when it does or on error |
+| `leaf` | The leaf certificate; `null` on error |
+| `chain` | Every certificate the server sent, leaf first; `null` on error |
+| `error` | `{"code","message"}` when the target could not be read; `null` otherwise |
+
+## Certificate
+
+`leaf` and each entry of `chain` have these fields:
+
+| Field | Meaning |
+|---|---|
+| `subject` | Distinguished name |
+| `issuer` | Distinguished name of the issuer |
+| `serial` | Serial number in hex |
+| `not_before` | Start of validity, RFC 3339 in UTC |
+| `not_after` | End of validity, RFC 3339 in UTC |
+| `dns_names` | Subject alternative names of type DNS |
+
+## Other output
+
+`--version` prints `{"version":"..."}`. A command error prints one line on stderr, described in [Exit and error codes](/expirely-cli/reference/codes/).

@@ -1,0 +1,38 @@
+---
+title: Exit and error codes
+description: What each exit code and error code of expirely means.
+---
+
+## Exit codes
+
+When a scan has several outcomes, 1 wins over 3.
+
+| Code | Meaning |
+|---|---|
+| 0 | Every target is `ok`, or `--help` or `--version` ran |
+| 1 | At least one certificate is `expired` or `expiring` |
+| 2 | Usage error: bad flag, invalid target, unreadable `--file` or no targets |
+| 3 | At least one target could not be read, or writing the output failed |
+
+## Error codes
+
+Scripts and agents match on `code`; a code is never renamed or reused. A command error is one JSON line on stderr when output is JSON:
+
+```json
+{"error":{"code":"invalid_flag","message":"flag provided but not defined: -nope"}}
+```
+
+| Code | Exit | Meaning |
+|---|---|---|
+| `invalid_flag` | 2 | A flag is unknown or has a bad value |
+| `invalid_target` | 2 | A target is not a host, host:port or https:// URL |
+| `missing_arguments` | 2 | No target was given in the arguments or files |
+| `file_unreadable` | 2 | A `--file` could not be opened or read, or has a line over 64 KiB |
+| `output_failed` | 3 | Writing the result to stdout failed, for example a closed pipe |
+
+A target that could not be read is a result, not a command error: its `status` is `error` and its `error.code` is one of these.
+
+| Code | Exit | Meaning |
+|---|---|---|
+| `dial_failed` | 3 | The TCP connection to the target failed |
+| `handshake_failed` | 3 | The TLS handshake failed or the server sent no certificate |
