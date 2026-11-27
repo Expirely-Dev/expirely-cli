@@ -25,4 +25,4 @@ just fmt
 just check
 ```
 
-Commit titles follow Conventional Commits: `<type>(<scope>): <summary>`, imperative, lowercase, at most 72 characters.
+Commit titles follow Conventional Commits: `<type>(<scope>): <summary>`, imperative, lowercase, at most 72 characters. release-please reads them to choose the next version and write `CHANGELOG.md`: a new capability is `feat`, a defect `fix`, and a breaking change adds `!` and a `BREAKING CHANGE:` footer. `CHANGELOG.md` is written by the release pull request, not by hand.

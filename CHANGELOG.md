@@ -1,6 +1,6 @@
 # Changelog
 
-Every release of expirely, newest first. Until 1.0, a release can change flags, JSON fields and codes; each change that does is under **Breaking**, with what to do.
+Every release of expirely, newest first. From v0.4.0 on, release-please writes this file from the commit titles. Until 1.0, a release can change flags, JSON fields and codes; such a change is listed as breaking, with what to do.
 
 ## v0.3.0 - 2026-11-26
 

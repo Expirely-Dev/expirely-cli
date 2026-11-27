@@ -81,6 +81,23 @@ third-party-licenses dir:
 licenses-check:
     tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT; just third-party-licenses "$tmp/third-party"
 
+# Check that every commit title in RANGE follows Conventional Commits, which release-please reads to choose the next version.
+commit-check range:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    pattern='^(feat|fix|perf|revert|docs|build|ci|chore|refactor|test)(\([a-z0-9-]+\))?!?: [^A-Z].*$'
+    failed=0
+    while IFS= read -r line; do
+      sha="${line%% *}"; title="${line#* }"
+      [[ "$title" == Merge\ * ]] && continue
+      if [[ ! "$title" =~ $pattern ]]; then
+        echo "$sha: \"$title\" is not <type>(<scope>): <summary> with a lowercase summary" >&2; failed=1
+      elif (( ${#title} > 80 )); then
+        echo "$sha: \"$title\" is longer than 80 characters" >&2; failed=1
+      fi
+    done < <(git log --format='%h %s' "{{range}}")
+    exit "$failed"
+
 # Validate the release configuration.
 release-check:
     {{goreleaser}} check

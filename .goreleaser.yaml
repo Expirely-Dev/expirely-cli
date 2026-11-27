@@ -37,8 +37,7 @@ checksum:
   algorithm: sha256
 
 changelog:
-  use: github
-  sort: asc
+  disable: true
 
 release:
-  draft: true
+  mode: keep-existing
