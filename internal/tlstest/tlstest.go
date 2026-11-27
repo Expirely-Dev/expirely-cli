@@ -35,7 +35,7 @@ func NewCA(t testing.TB) CA {
 		NotAfter:              time.Now().Add(30 * 24 * time.Hour),
 		IsCA:                  true,
 		BasicConstraintsValid: true,
-		KeyUsage:              x509.KeyUsageCertSign,
+		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
 	}
 	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
 	if err != nil {
@@ -74,6 +74,50 @@ func (ca CA) Leaf(t testing.TB, dnsName string, notAfter time.Time) tls.Certific
 		t.Fatal(err)
 	}
 	return tls.Certificate{Certificate: [][]byte{der}, PrivateKey: key}
+}
+
+// RevocableLeaf issues a server certificate for dnsName, valid for 90 days,
+// with serial and a CRL distribution point at crlURL. The returned chain
+// holds the leaf and the CA certificate, so a client can verify the CA's CRL
+// against the issuer the server sent.
+func (ca CA) RevocableLeaf(t testing.TB, dnsName string, serial int64, crlURL string) tls.Certificate {
+	t.Helper()
+	key := newKey(t)
+	tmpl := &x509.Certificate{
+		SerialNumber:          big.NewInt(serial),
+		Subject:               pkix.Name{CommonName: dnsName},
+		DNSNames:              []string{dnsName},
+		NotBefore:             time.Now().Add(-time.Hour),
+		NotAfter:              time.Now().Add(90 * 24 * time.Hour),
+		KeyUsage:              x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		CRLDistributionPoints: []string{crlURL},
+	}
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, ca.Cert, &key.PublicKey, ca.Key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return tls.Certificate{Certificate: [][]byte{der, ca.Cert.Raw}, PrivateKey: key}
+}
+
+// CRL returns a DER revocation list signed by the CA that revokes the
+// serials and is valid until nextUpdate.
+func (ca CA) CRL(t testing.TB, nextUpdate time.Time, serials ...int64) []byte {
+	t.Helper()
+	entries := make([]x509.RevocationListEntry, len(serials))
+	for i, s := range serials {
+		entries[i] = x509.RevocationListEntry{SerialNumber: big.NewInt(s), RevocationTime: time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)}
+	}
+	der, err := x509.CreateRevocationList(rand.Reader, &x509.RevocationList{
+		Number:                    big.NewInt(1),
+		ThisUpdate:                time.Now().Add(-time.Hour),
+		NextUpdate:                nextUpdate,
+		RevokedCertificateEntries: entries,
+	}, ca.Cert, ca.Key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return der
 }
 
 // SelfSigned creates a certificate for dnsName that signs itself, valid from

@@ -112,6 +112,7 @@ A field that could not be read is `null`, never zero or a default date. Every re
 | `tls.trusted` | Whether the chain verifies for the host against the system roots |
 | `tls.trust_issue` | Why the chain does not verify, as one of the values below; `null` when it does |
 | `tls.verify_error` | The full verification error; `null` when the chain verifies |
+| `tls.revocation` | With `--revocation`, `{"status","reason"}`: `status` is `good`, `revoked` or `unknown`, and `reason` says when the certificate was revoked or why the state is unknown, `null` when good. `null` when revocation was not checked, which is the default and always the case for a cloud source. See [Revocation](/cli/tls#revocation) |
 | `tls.leaf` | The leaf certificate |
 | `tls.chain` | Every certificate the server sent, leaf first. Present only with `--details` |
 
