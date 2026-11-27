@@ -51,9 +51,9 @@ func appendFile(path, text string) error {
 	return f.Close()
 }
 
-// needsAttention reports whether f is expired, expiring, unreadable or of
-// unknown end date.
-func needsAttention(f scan.Finding) bool { return f.Status != scan.StatusOK }
+// needsAttention reports whether f is expired, expiring, unreadable, of
+// unknown end date, or revoked.
+func needsAttention(f scan.Finding) bool { return f.Status != scan.StatusOK || revoked(f) }
 
 // githubSummary is the Markdown job summary of r: a table of every result
 // that needs attention, most urgent first, or one line naming the
@@ -123,6 +123,8 @@ func detail(f scan.Finding) string {
 	switch {
 	case f.Error != nil:
 		return f.Error.Reason
+	case revoked(f):
+		return "revoked"
 	case f.Status == scan.StatusUnknown && providerState(f) != "":
 		return "no end date: " + providerState(f)
 	case f.TLS.TrustIssue != nil && *f.TLS.TrustIssue != scan.TrustExpired:
@@ -165,6 +167,8 @@ func writeAnnotations(w io.Writer, r report, findings []scan.Finding) {
 			title, message = "Certificate not read: "+target, target+" could not be read: "+when(f)+"."
 		case scan.StatusUnknown:
 			title, message = "Certificate end date unknown: "+target, target+" has no end date to read."
+		case scan.StatusOK:
+			title, message = "Certificate revoked: "+target, target+" is revoked by its CA; it expires in "+when(f)+", on "+date(f)+"."
 		}
 		if shown[kind] == maxAnnotations {
 			hidden++

@@ -11,7 +11,7 @@ expirely tls aws --profile production
 expirely tls gcp --project production
 ```
 
-It only reads: a TLS handshake, or a few list calls to AWS or Google Cloud. Exit code `1` means something needs renewing, so the same command gates CI, alerts from cron and gives AI agents JSON.
+It only reads: a TLS handshake, or a few list calls to AWS or Google Cloud, plus a request for the CA's revocation list when `--revocation` asks for one. Exit code `1` means something needs renewing, so the same command gates CI, alerts from cron and gives AI agents JSON.
 
 ## Install
 

@@ -18,6 +18,7 @@ import (
 	"github.com/expirely-dev/expirely-cli/internal/acm"
 	"github.com/expirely-dev/expirely-cli/internal/gcp"
 	"github.com/expirely-dev/expirely-cli/internal/probe"
+	"github.com/expirely-dev/expirely-cli/internal/revocation"
 	"github.com/expirely-dev/expirely-cli/internal/scan"
 	"github.com/expirely-dev/expirely-cli/internal/ui"
 )
@@ -127,6 +128,8 @@ Scan
       --timeout DURATION  time each target has to connect and handshake (default 10s)
       --concurrency N     targets scanned at once (default 16)
       --ca-file PATH      also trust the CA certificates in this PEM file
+      --revocation        also check each certificate against the revocation list (CRL)
+                          its CA publishes; fetches that list over HTTP
 
 Output
       --json              print JSON; the default when stdout is not a terminal
@@ -203,6 +206,7 @@ func runScan(ctx context.Context, args []string, s Streams) int {
 	showVersion := fs.Bool("version", false, "")
 	w := windowFlags(fs, defaultTimeout)
 	concurrency := fs.Int("concurrency", defaultConcurrency, "")
+	checkRevocation := fs.Bool("revocation", false, "")
 	v := viewFlags(fs)
 	fs.BoolVar(&v.details, "details", false, "")
 	var files, caFiles fileList
@@ -252,6 +256,9 @@ func runScan(ctx context.Context, args []string, s Streams) int {
 
 	start := time.Now()
 	opts := scan.Options{Warn: w.warn(), Timeout: w.timeout, Now: start, Concurrency: *concurrency}
+	if *checkRevocation {
+		opts.Revocation = &revocation.Checker{}
+	}
 	var spinner *ui.Spinner
 	if c.showsProgress() {
 		spinner = ui.StartSpinner(c.Stderr, len(targets))

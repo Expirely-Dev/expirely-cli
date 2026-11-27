@@ -5,12 +5,14 @@ package scan
 
 import (
 	"context"
+	"crypto/x509"
 	"encoding/hex"
 	"errors"
 	"sync"
 	"time"
 
 	"github.com/expirely-dev/expirely-cli/internal/probe"
+	"github.com/expirely-dev/expirely-cli/internal/revocation"
 	"github.com/expirely-dev/expirely-cli/internal/target"
 )
 
@@ -106,7 +108,10 @@ type TLSInfo struct {
 	// constants; it is nil when the chain verifies or was not read.
 	TrustIssue  *string `json:"trust_issue"`
 	VerifyError *string `json:"verify_error"`
-	Leaf        *Cert   `json:"leaf"`
+	// Revocation is whether the leaf is revoked, read from its CA's CRL;
+	// it is nil when revocation was not checked.
+	Revocation *Revocation `json:"revocation"`
+	Leaf       *Cert       `json:"leaf"`
 	// Chain is every certificate the server sent, leaf first. Reports
 	// leave it out unless asked for, since it is most of their size.
 	Chain []Cert `json:"chain,omitempty"`
@@ -140,6 +145,20 @@ type ACMInfo struct {
 	InUseBy            []string `json:"in_use_by"`
 }
 
+// Revocation is what a CRL says about a leaf. Status is one of the
+// revocation package's statuses; Reason says why it is unknown or when the
+// leaf was revoked, and is nil for a good one.
+type Revocation struct {
+	Status string  `json:"status"`
+	Reason *string `json:"reason"`
+}
+
+// RevocationChecker tells whether leaf, issued by issuer, is revoked. issuer
+// is nil when the served chain holds no certificate that signed leaf.
+type RevocationChecker interface {
+	Check(ctx context.Context, leaf, issuer *x509.Certificate) revocation.Result
+}
+
 // Prober reads the certificate chain of a target.
 type Prober interface {
 	Probe(ctx context.Context, t target.Target) (probe.Result, error)
@@ -158,6 +177,10 @@ type Options struct {
 	// Progress, when set, is called once as each target finishes, from the
 	// goroutine that probed it, so it must be safe for concurrent use.
 	Progress func()
+	// Revocation, when set, checks each chain read against its CA's CRL,
+	// within its own Timeout after the handshake. It is called from the
+	// goroutines that probe, so it must be safe for concurrent use.
+	Revocation RevocationChecker
 }
 
 // Scan probes the targets, at most opts.Concurrency at a time, and returns
@@ -195,13 +218,34 @@ admit:
 }
 
 func scanOne(ctx context.Context, p Prober, t target.Target, opts Options) Finding {
-	ctx, cancel := context.WithTimeout(ctx, opts.Timeout)
+	probeCtx, cancel := context.WithTimeout(ctx, opts.Timeout)
 	defer cancel()
-	r, err := p.Probe(ctx, t)
+	r, err := p.Probe(probeCtx, t)
 	if err != nil {
 		return errorFinding(t, err)
 	}
-	return Classify(r, opts.Now, opts.Warn)
+	f := Classify(r, opts.Now, opts.Warn)
+	if opts.Revocation != nil {
+		checkCtx, cancel := context.WithTimeout(ctx, opts.Timeout)
+		defer cancel()
+		res := opts.Revocation.Check(checkCtx, r.Chain[0], issuerOf(r.Chain))
+		f.TLS.Revocation = &Revocation{Status: res.Status}
+		if res.Reason != "" {
+			f.TLS.Revocation.Reason = &res.Reason
+		}
+	}
+	return f
+}
+
+// issuerOf returns the certificate in chain that signed its leaf, or nil
+// when the server did not send it.
+func issuerOf(chain []*x509.Certificate) *x509.Certificate {
+	for _, c := range chain[1:] {
+		if chain[0].CheckSignatureFrom(c) == nil {
+			return c
+		}
+	}
+	return nil
 }
 
 // Expiry returns the finding for a certificate known by its end date

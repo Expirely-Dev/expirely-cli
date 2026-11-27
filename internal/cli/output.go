@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/expirely-dev/expirely-cli/internal/revocation"
 	"github.com/expirely-dev/expirely-cli/internal/scan"
 	"github.com/expirely-dev/expirely-cli/internal/ui"
 )
@@ -311,10 +312,18 @@ func note(f scan.Finding) (text string, warn bool) {
 		}
 		return usageNote("self-managed", len(f.GCP.InUseBy))
 	}
+	if revoked(f) {
+		return "revoked", true
+	}
 	if f.TLS.TrustIssue == nil {
 		return "", false
 	}
 	return trustWords[*f.TLS.TrustIssue], true
+}
+
+// revoked reports whether a revocation check found f's leaf revoked.
+func revoked(f scan.Finding) bool {
+	return f.TLS.Revocation != nil && f.TLS.Revocation.Status == revocation.StatusRevoked
 }
 
 // providerState is the provider's own state of a certificate, in words, such
