@@ -2,6 +2,28 @@
 
 Every release of expirely, newest first. From v0.4.0 on, release-please writes this file from the commit titles. Until 1.0, a release can change flags, JSON fields and codes; such a change is listed as breaking, with what to do.
 
+## [0.10.0](https://github.com/Expirely-Dev/expirely-cli/compare/v0.9.0...v0.10.0) (2026-11-27)
+
+
+### ⚠ BREAKING CHANGES
+
+* **cli:** remove the deprecated aws, gcp and bare-target forms ([#10](https://github.com/Expirely-Dev/expirely-cli/issues/10))
+* report certificates without an end date as unknown ([#9](https://github.com/Expirely-Dev/expirely-cli/issues/9))
+* **output:** give every json result a common envelope ([#7](https://github.com/Expirely-Dev/expirely-cli/issues/7))
+
+### Added
+
+* **cli:** describe the public contract in manifest.json ([#15](https://github.com/Expirely-Dev/expirely-cli/issues/15)) ([af6605e](https://github.com/Expirely-Dev/expirely-cli/commit/af6605ef45ea288af4ef80d45937a9aeb5f7f196))
+* **cli:** remove the deprecated aws, gcp and bare-target forms ([#10](https://github.com/Expirely-Dev/expirely-cli/issues/10)) ([0b776e2](https://github.com/Expirely-Dev/expirely-cli/commit/0b776e2a2d312afbc99bc2dd0e42a19795717d81))
+* **output:** give every json result a common envelope ([#7](https://github.com/Expirely-Dev/expirely-cli/issues/7)) ([95f84f7](https://github.com/Expirely-Dev/expirely-cli/commit/95f84f745a95a3e6dc2261fe744ba75ded2bd77a))
+* **tls:** check revocation against crls with --revocation ([#11](https://github.com/Expirely-Dev/expirely-cli/issues/11)) ([7b5ce69](https://github.com/Expirely-Dev/expirely-cli/commit/7b5ce69b923ca262cfc6033a05677ab666691a31))
+
+
+### Fixed
+
+* **cli:** gate revocation on trust, add revoked status, mend help ([#13](https://github.com/Expirely-Dev/expirely-cli/issues/13)) ([fda985f](https://github.com/Expirely-Dev/expirely-cli/commit/fda985fca7c933ee6f2398cac4ea92984dadc3de))
+* report certificates without an end date as unknown ([#9](https://github.com/Expirely-Dev/expirely-cli/issues/9)) ([cf65b73](https://github.com/Expirely-Dev/expirely-cli/commit/cf65b73c7f67a314e803f8374f28377c17b0536b))
+
 ## [0.9.0](https://github.com/Expirely-Dev/expirely-cli/compare/v0.8.0...v0.9.0) (2026-11-27)
 
 
