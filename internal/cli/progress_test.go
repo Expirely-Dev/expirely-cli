@@ -10,9 +10,9 @@ import (
 	"time"
 
 	sdk "github.com/aws/aws-sdk-go-v2/service/acm"
-	"github.com/bycavii/expirely-cli/internal/acm"
-	"github.com/bycavii/expirely-cli/internal/gcp"
-	"github.com/bycavii/expirely-cli/internal/gcp/gcptest"
+	"github.com/expirely-dev/expirely-cli/internal/acm"
+	"github.com/expirely-dev/expirely-cli/internal/gcp"
+	"github.com/expirely-dev/expirely-cli/internal/gcp/gcptest"
 )
 
 const slowRead = 300 * time.Millisecond

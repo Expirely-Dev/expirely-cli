@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/bycavii/expirely-cli/internal/tlstest"
-	"github.com/bycavii/expirely-cli/internal/ui"
 	"github.com/charmbracelet/colorprofile"
+	"github.com/expirely-dev/expirely-cli/internal/tlstest"
+	"github.com/expirely-dev/expirely-cli/internal/ui"
 )
 
 func envOf(vars map[string]string) func(string) string {

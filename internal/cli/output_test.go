@@ -11,11 +11,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/bycavii/expirely-cli/internal/scan"
-	"github.com/bycavii/expirely-cli/internal/tlstest"
-	"github.com/bycavii/expirely-cli/internal/ui"
 	"github.com/charmbracelet/colorprofile"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/expirely-dev/expirely-cli/internal/scan"
+	"github.com/expirely-dev/expirely-cli/internal/tlstest"
+	"github.com/expirely-dev/expirely-cli/internal/ui"
 )
 
 var update = flag.Bool("update", false, "rewrite the golden files")

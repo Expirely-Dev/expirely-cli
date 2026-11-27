@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bycavii/expirely-cli/internal/scan"
-	"github.com/bycavii/expirely-cli/internal/ui"
+	"github.com/expirely-dev/expirely-cli/internal/scan"
+	"github.com/expirely-dev/expirely-cli/internal/ui"
 )
 
 // report is the JSON document a command prints; its field names are part

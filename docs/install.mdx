@@ -11,32 +11,39 @@ expirely is one static binary for Linux, macOS and Windows. It needs no server, 
 On macOS and Linux:
 
 ```sh
-brew install bycavii/tap/expirely
+brew install expirely-dev/tap/expirely
 expirely --version
 ```
 
-`brew upgrade` keeps it current. Installing by the full name taps [bycavii/homebrew-tap](https://github.com/bycavii/homebrew-tap) and trusts only this formula. The formula of each version is generated after its release: the archives pass `gh attestation verify` against the release workflow before their checksums go into it, so Homebrew installs only binaries this repository built.
+`brew upgrade` keeps it current. Installing by the full name taps [expirely-dev/homebrew-tap](https://github.com/expirely-dev/homebrew-tap) and trusts only this formula. The formula of each version is generated after its release: the archives pass `gh attestation verify` against the release workflow before their checksums go into it, so Homebrew installs only binaries this repository built.
 
 ## From a release
 
-Each [release](https://github.com/bycavii/expirely-cli/releases) has an archive for Linux, macOS and Windows on amd64 and arm64, with the binary, the license and the licenses of every module it links under `third-party/`, plus `checksums.txt`. On macOS on Apple silicon:
+Each [release](https://github.com/expirely-dev/expirely-cli/releases) has an archive for Linux, macOS and Windows on amd64 and arm64, with the binary, the license and the licenses of every module it links under `third-party/`, plus `checksums.txt`. On macOS on Apple silicon:
 
 ```sh
-gh release download --repo bycavii/expirely-cli --pattern 'expirely_*_darwin_arm64.tar.gz'
-gh attestation verify expirely_*_darwin_arm64.tar.gz --repo bycavii/expirely-cli \
-  --signer-workflow bycavii/expirely-cli/.github/workflows/release.yml
+gh release download --repo expirely-dev/expirely-cli --pattern 'expirely_*_darwin_arm64.tar.gz'
+gh attestation verify expirely_*_darwin_arm64.tar.gz --repo Expirely-Dev/expirely-cli \
+  --signer-workflow Expirely-Dev/expirely-cli/.github/workflows/release.yml
 tar -xzf expirely_*_darwin_arm64.tar.gz expirely
 ./expirely --version
 ```
 
 Every archive from v0.5.0 on carries a [SLSA build provenance](https://slsa.dev/spec/v1.0/provenance) attestation, signed through Sigstore with the identity of the release workflow, with no key to manage. `gh attestation verify` passes only for an archive that workflow built from this repository, at the commit the attestation names. Older archives are checked against `checksums.txt` alone.
 
+The repository moved from `bycavii` to `expirely-dev` after v0.7.0, and an attestation keeps the name it was signed under. Verify v0.5.0 to v0.7.0 with the old owner:
+
+```sh
+gh attestation verify expirely_0.7.0_darwin_arm64.tar.gz --owner bycavii \
+  --signer-workflow bycavii/expirely-cli/.github/workflows/release.yml
+```
+
 ## With Go
 
 With Go 1.27 or newer:
 
 ```sh
-go install github.com/bycavii/expirely-cli/cmd/expirely@latest
+go install github.com/expirely-dev/expirely-cli/cmd/expirely@latest
 expirely --version
 ```
 
@@ -45,7 +52,7 @@ expirely --version
 ## From source
 
 ```sh
-git clone https://github.com/bycavii/expirely-cli.git
+git clone https://github.com/expirely-dev/expirely-cli.git
 cd expirely-cli
 go build -o expirely ./cmd/expirely
 ./expirely example.com

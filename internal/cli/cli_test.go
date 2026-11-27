@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/bycavii/expirely-cli/internal/scan"
-	"github.com/bycavii/expirely-cli/internal/tlstest"
+	"github.com/expirely-dev/expirely-cli/internal/scan"
+	"github.com/expirely-dev/expirely-cli/internal/tlstest"
 )
 
 func run(t *testing.T, terminal bool, args ...string) (code int, stdout, stderr string) {

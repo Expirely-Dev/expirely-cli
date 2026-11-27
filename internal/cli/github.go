@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/bycavii/expirely-cli/internal/scan"
-	"github.com/bycavii/expirely-cli/internal/ui"
+	"github.com/expirely-dev/expirely-cli/internal/scan"
+	"github.com/expirely-dev/expirely-cli/internal/ui"
 )
 
 // maxSummaryRows bounds the job summary table, far below GitHub's 1 MiB

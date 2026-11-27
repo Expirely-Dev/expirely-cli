@@ -15,11 +15,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bycavii/expirely-cli/internal/acm"
-	"github.com/bycavii/expirely-cli/internal/gcp"
-	"github.com/bycavii/expirely-cli/internal/probe"
-	"github.com/bycavii/expirely-cli/internal/scan"
-	"github.com/bycavii/expirely-cli/internal/ui"
+	"github.com/expirely-dev/expirely-cli/internal/acm"
+	"github.com/expirely-dev/expirely-cli/internal/gcp"
+	"github.com/expirely-dev/expirely-cli/internal/probe"
+	"github.com/expirely-dev/expirely-cli/internal/scan"
+	"github.com/expirely-dev/expirely-cli/internal/ui"
 )
 
 // Exit codes returned by Run, in order of precedence when a scan has
@@ -116,7 +116,7 @@ Exit codes, over every result whatever --status, --fields and --limit show
   0 all ok, 1 expired or expiring, 2 usage error, 3 a target could not be read,
   130 stopped by Ctrl-C
 
-Docs: https://github.com/bycavii/expirely-cli
+Docs: https://github.com/expirely-dev/expirely-cli
 `
 
 // Run executes expirely with args, which exclude the program name, and

@@ -14,8 +14,8 @@ import (
 	"time"
 
 	"github.com/aws/smithy-go"
-	"github.com/bycavii/expirely-cli/internal/acm"
-	"github.com/bycavii/expirely-cli/internal/scan"
+	"github.com/expirely-dev/expirely-cli/internal/acm"
+	"github.com/expirely-dev/expirely-cli/internal/scan"
 )
 
 const defaultAWSTimeout = 30 * time.Second

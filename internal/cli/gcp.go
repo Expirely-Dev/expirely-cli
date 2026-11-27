@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/bycavii/expirely-cli/internal/gcp"
-	"github.com/bycavii/expirely-cli/internal/scan"
+	"github.com/expirely-dev/expirely-cli/internal/gcp"
+	"github.com/expirely-dev/expirely-cli/internal/scan"
 )
 
 const defaultGCPTimeout = 30 * time.Second

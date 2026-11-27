@@ -6,10 +6,10 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/bycavii/expirely-cli/internal/cli"
-	"github.com/bycavii/expirely-cli/internal/ui"
 	"github.com/charmbracelet/colorprofile"
 	"github.com/charmbracelet/x/term"
+	"github.com/expirely-dev/expirely-cli/internal/cli"
+	"github.com/expirely-dev/expirely-cli/internal/ui"
 )
 
 func main() {

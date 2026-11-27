@@ -8,7 +8,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/bycavii/expirely-cli/internal/scan"
+	"github.com/expirely-dev/expirely-cli/internal/scan"
 )
 
 // statusOrder lists the statuses from most to least urgent; results are

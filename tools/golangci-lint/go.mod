@@ -1,4 +1,4 @@
-module github.com/bycavii/expirely-cli/tools/golangci-lint
+module github.com/expirely-dev/expirely-cli/tools/golangci-lint
 
 go 1.27.4
 

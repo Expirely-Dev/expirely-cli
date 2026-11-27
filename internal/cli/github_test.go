@@ -13,7 +13,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/acm/types"
-	"github.com/bycavii/expirely-cli/internal/acm"
+	"github.com/expirely-dev/expirely-cli/internal/acm"
 )
 
 func runInActions(t *testing.T, env map[string]string, client acm.API, args ...string) (code int, stdout, stderr, summary string) {

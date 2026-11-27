@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/bycavii/expirely-cli/internal/gcp/gcptest"
+	"github.com/expirely-dev/expirely-cli/internal/gcp/gcptest"
 )
 
 func service(t *testing.T, f gcptest.Fake) *Service {

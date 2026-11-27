@@ -14,8 +14,8 @@ import (
 	sdk "github.com/aws/aws-sdk-go-v2/service/acm"
 	"github.com/aws/aws-sdk-go-v2/service/acm/types"
 	"github.com/aws/smithy-go"
-	"github.com/bycavii/expirely-cli/internal/acm"
-	"github.com/bycavii/expirely-cli/internal/scan"
+	"github.com/expirely-dev/expirely-cli/internal/acm"
+	"github.com/expirely-dev/expirely-cli/internal/scan"
 )
 
 type fakeACM struct {

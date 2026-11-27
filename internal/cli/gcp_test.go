@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/bycavii/expirely-cli/internal/gcp"
-	"github.com/bycavii/expirely-cli/internal/gcp/gcptest"
-	"github.com/bycavii/expirely-cli/internal/scan"
+	"github.com/expirely-dev/expirely-cli/internal/gcp"
+	"github.com/expirely-dev/expirely-cli/internal/gcp/gcptest"
+	"github.com/expirely-dev/expirely-cli/internal/scan"
 )
 
 func runGCPWith(t *testing.T, terminal bool, f gcptest.Fake, env map[string]string, args ...string) (code int, stdout, stderr string) {

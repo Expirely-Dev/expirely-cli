@@ -1,4 +1,4 @@
-module github.com/bycavii/expirely-cli/tools/goreleaser
+module github.com/expirely-dev/expirely-cli/tools/goreleaser
 
 go 1.27.4
 

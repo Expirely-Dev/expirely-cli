@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bycavii/expirely-cli/internal/scan"
-	"github.com/bycavii/expirely-cli/internal/ui"
+	"github.com/expirely-dev/expirely-cli/internal/scan"
+	"github.com/expirely-dev/expirely-cli/internal/ui"
 )
 
 // command is one run of expirely or of a subcommand: the streams it writes

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/bycavii/expirely-cli/internal/probe"
+	"github.com/expirely-dev/expirely-cli/internal/probe"
 )
 
 // Trust issues name why a chain does not verify. They are part of the

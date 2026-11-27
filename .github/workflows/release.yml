@@ -68,7 +68,7 @@ jobs:
         with:
           app-id: ${{ secrets.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
-          owner: bycavii
+          owner: expirely-dev
           repositories: homebrew-tap
           permission-actions: write
       - name: Ask the tap to publish the release
@@ -77,7 +77,7 @@ jobs:
           TAG: ${{ needs.release-please.outputs.tag }}
           REVIEWER: ${{ github.actor }}
         run: |
-          gh workflow run publish-release.yml --repo bycavii/homebrew-tap \
+          gh workflow run publish-release.yml --repo expirely-dev/homebrew-tap \
             --field version="$TAG" --field reviewer="$REVIEWER"
 
   action:
@@ -92,7 +92,7 @@ jobs:
         with:
           app-id: ${{ secrets.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
-          owner: bycavii
+          owner: expirely-dev
           repositories: expirely-action
           permission-actions: write
       - name: Ask the action to make this release its default
@@ -101,5 +101,5 @@ jobs:
           TAG: ${{ needs.release-please.outputs.tag }}
           REVIEWER: ${{ github.actor }}
         run: |
-          gh workflow run bump-cli.yml --repo bycavii/expirely-action \
+          gh workflow run bump-cli.yml --repo expirely-dev/expirely-action \
             --field version="$TAG" --field reviewer="$REVIEWER"

@@ -1,4 +1,4 @@
-module github.com/bycavii/expirely-cli
+module github.com/expirely-dev/expirely-cli
 
 go 1.27.4
 

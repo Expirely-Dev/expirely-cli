@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/bycavii/expirely-cli/internal/tlstest"
+	"github.com/expirely-dev/expirely-cli/internal/tlstest"
 )
 
 func TestRunTrustsAnInternalCAFromCAFile(t *testing.T) {

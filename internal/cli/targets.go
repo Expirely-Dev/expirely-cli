@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/bycavii/expirely-cli/internal/target"
+	"github.com/expirely-dev/expirely-cli/internal/target"
 )
 
 // fileList collects repeated --file flags.

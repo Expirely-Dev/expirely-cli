@@ -1,4 +1,4 @@
-module github.com/bycavii/expirely-cli/tools/actionlint
+module github.com/expirely-dev/expirely-cli/tools/actionlint
 
 go 1.27.4
 

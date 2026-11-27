@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/bycavii/expirely-cli/internal/probe"
-	"github.com/bycavii/expirely-cli/internal/target"
+	"github.com/expirely-dev/expirely-cli/internal/probe"
+	"github.com/expirely-dev/expirely-cli/internal/target"
 )
 
 var now = time.Date(2026, 11, 26, 12, 0, 0, 0, time.UTC)

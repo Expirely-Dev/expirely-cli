@@ -7,7 +7,7 @@ expirely exits with `1` when any certificate is expired or expires within `--war
 
 ## GitHub Actions
 
-[bycavii/expirely-action](https://github.com/bycavii/expirely-action) installs a pinned expirely, checks the archive against its SHA-256 and runs it:
+[expirely-dev/expirely-action](https://github.com/expirely-dev/expirely-action) installs a pinned expirely, checks the archive against its SHA-256 and runs it:
 
 ```yaml .github/workflows/certificates.yml
 name: certificates
@@ -25,7 +25,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: bycavii/expirely-action@v1
+      - uses: expirely-dev/expirely-action@v1
         with:
           targets: |
             example.com
@@ -41,7 +41,7 @@ Inside a workflow, expirely itself adds to the run, with or without the action:
 The summary and annotations cover every result, whatever `--status`, `--fields` and `--limit` show. `EXPIRELY_GITHUB=0` turns them off. Without the action, install the binary and run it like any other command:
 
 ```yaml
-      - run: go install github.com/bycavii/expirely-cli/cmd/expirely@latest
+      - run: go install github.com/expirely-dev/expirely-cli/cmd/expirely@latest
       - run: expirely -f targets.txt --warn-days 21
 ```
 
