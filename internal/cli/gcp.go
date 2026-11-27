@@ -101,15 +101,20 @@ func runGCP(ctx context.Context, args []string, s Streams) int {
 }
 
 // gcpFindings turns a project's certificates into findings. A managed
-// certificate that was not issued yet has no end date and is left out.
+// certificate that was not issued yet has no end date and is unknown;
+// gcp.state says why.
 func gcpFindings(certs []gcp.Certificate, now time.Time, warn time.Duration) []scan.Finding {
 	findings := make([]scan.Finding, 0, len(certs))
 	for _, cert := range certs {
-		if cert.NotAfter == nil {
-			continue
+		f := scan.Unknown(scan.SourceGCP, cert.Domain)
+		if cert.NotAfter != nil {
+			f = scan.Expiry(scan.SourceGCP, cert.Domain, *cert.NotAfter, now, warn)
 		}
-		f := scan.Expiry(scan.SourceGCP, cert.Domain, *cert.NotAfter, now, warn)
-		f.GCP = &scan.GCPInfo{Name: cert.Name, Location: cert.Location, Source: cert.Source, Managed: cert.Managed, InUseBy: orEmpty(cert.InUseBy)}
+		var state *string
+		if cert.State != "" {
+			state = &cert.State
+		}
+		f.GCP = &scan.GCPInfo{Name: cert.Name, Location: cert.Location, Source: cert.Source, Managed: cert.Managed, State: state, InUseBy: orEmpty(cert.InUseBy)}
 		findings = append(findings, f)
 	}
 	return findings

@@ -50,11 +50,12 @@ func TestGitHubActionsSummaryAndAnnotations(t *testing.T) {
 		t.Errorf("stdout = %q, want only the JSON report; annotations belong on stderr", stdout)
 	}
 	for _, want := range []string{
-		"## expirely: 3 certificates need attention\n",
+		"## expirely: 4 certificates need attention\n",
+		"| unknown | `pending.example.com` |  |  | no end date: pending validation |",
 		"| expired | `api.example.org` |",
 		"| expiring | `api.example.com` |",
 		"ACM us-east-1, in use by 2 resources",
-		"Checked 5: 2 ok, 1 expiring, 2 expired, 0 unreadable, 0 unknown. warn-days 30,",
+		"Checked 6: 2 ok, 1 expiring, 2 expired, 0 unreadable, 1 unknown. warn-days 30,",
 	} {
 		if !strings.Contains(summary, want) {
 			t.Errorf("summary lacks %q:\n%s", want, summary)

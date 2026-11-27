@@ -299,6 +299,9 @@ func date(f scan.Finding) string {
 // it renews itself. An expired chain needs no note: its status already says
 // so. warn reports whether the note asks for attention.
 func note(f scan.Finding) (text string, warn bool) {
+	if f.Status == scan.StatusUnknown {
+		return providerState(f), true
+	}
 	if f.ACM != nil {
 		return acmNote(f.ACM)
 	}
@@ -312,6 +315,20 @@ func note(f scan.Finding) (text string, warn bool) {
 		return "", false
 	}
 	return trustWords[*f.TLS.TrustIssue], true
+}
+
+// providerState is the provider's own state of a certificate, in words, such
+// as "pending validation" for ACM's PENDING_VALIDATION, or "" when the
+// provider gave none.
+func providerState(f scan.Finding) string {
+	var state string
+	switch {
+	case f.ACM != nil:
+		state = f.ACM.Status
+	case f.GCP != nil && f.GCP.State != nil:
+		state = *f.GCP.State
+	}
+	return ui.Clean(strings.ToLower(strings.ReplaceAll(state, "_", " ")))
 }
 
 // acmNote says whether ACM renews a certificate and, when it does not, how

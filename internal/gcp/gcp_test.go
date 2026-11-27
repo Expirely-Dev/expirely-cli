@@ -50,14 +50,14 @@ func TestListReadsComputeCertificatesAndTheirProxies(t *testing.T) {
 	if want := time.Date(2026, 12, 8, 20, 0, 0, 0, time.UTC); api.NotAfter == nil || !api.NotAfter.Equal(want) {
 		t.Errorf("api-cert NotAfter = %v, want %v", api.NotAfter, want)
 	}
-	if www := certs["www-managed"]; www.Domain != "www.example.com" || !www.Managed || len(www.InUseBy) != 0 {
+	if www := certs["www-managed"]; www.Domain != "www.example.com" || !www.Managed || www.State != "ACTIVE" || len(www.InUseBy) != 0 {
 		t.Errorf("www-managed = %+v, want managed, named by its domain, unused", www)
 	}
 	if internal := certs["internal"]; internal.Location != "us-central1" || len(internal.InUseBy) != 1 {
 		t.Errorf("internal = %+v, want regional in us-central1, used by its regional proxy", internal)
 	}
-	if pending := certs["pending"]; pending.NotAfter != nil {
-		t.Errorf("pending = %+v, want no end date before it is issued", pending)
+	if pending := certs["pending"]; pending.NotAfter != nil || pending.State != "PROVISIONING" {
+		t.Errorf("pending = %+v, want no end date and state PROVISIONING before it is issued", pending)
 	}
 }
 
@@ -71,7 +71,7 @@ func TestListReadsCertificateManagerInEveryLocation(t *testing.T) {
 
 	certs := byName(got.Certificates)
 	shop := certs["shop-cm"]
-	if shop.Source != SourceCertificateManager || shop.Domain != "shop.example.com" || !shop.Managed || shop.Location != "global" ||
+	if shop.Source != SourceCertificateManager || shop.Domain != "shop.example.com" || !shop.Managed || shop.State != "ACTIVE" || shop.Location != "global" ||
 		len(shop.InUseBy) != 1 || shop.InUseBy[0] != "projects/acme-prod/locations/global/certificateMaps/main/certificateMapEntries/shop" {
 		t.Errorf("shop-cm = %+v, want a managed global Certificate Manager certificate used by one map entry", shop)
 	}

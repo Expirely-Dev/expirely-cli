@@ -51,14 +51,17 @@ const locationConcurrency = 8
 // Certificate is one certificate of the project. Source is SourceCompute or
 // SourceCertificateManager. Managed is true for a certificate Google issues
 // and renews; a self-managed one was uploaded and is never renewed. NotAfter
-// is nil for a managed certificate that was not issued yet. InUseBy holds
-// resource paths starting at "projects/".
+// is nil for a managed certificate that was not issued yet. State is
+// Google's provisioning state of a managed certificate, such as ACTIVE or
+// PROVISIONING, and empty for a self-managed one. InUseBy holds resource
+// paths starting at "projects/".
 type Certificate struct {
 	Name     string
 	Domain   string
 	Location string
 	Source   string
 	Managed  bool
+	State    string
 	NotAfter *time.Time
 	InUseBy  []string
 }
@@ -147,6 +150,7 @@ type sslCertificate struct {
 	Expire   string   `json:"expireTime"`
 	Managed  *struct {
 		Domains []string `json:"domains"`
+		Status  string   `json:"status"`
 	} `json:"managed"`
 }
 
@@ -185,6 +189,9 @@ func computeCertificates(ctx context.Context, svc *Service, project string, l *L
 				cert.Location = strings.TrimPrefix(scope, "regions/")
 				cert.Source = SourceCompute
 				cert.Managed = c.Type == "MANAGED"
+				if c.Managed != nil {
+					cert.State = c.Managed.Status
+				}
 				cert.InUseBy = users[resourcePath(c.SelfLink)]
 				l.Certificates = append(l.Certificates, cert)
 			}
@@ -244,6 +251,7 @@ type managerCertificate struct {
 	Expire  string   `json:"expireTime"`
 	Managed *struct {
 		Domains []string `json:"domains"`
+		State   string   `json:"state"`
 	} `json:"managed"`
 	UsedBy []struct {
 		Name string `json:"name"`
@@ -328,6 +336,9 @@ func managerLocation(ctx context.Context, svc *Service, project, location string
 			cert.Location = location
 			cert.Source = SourceCertificateManager
 			cert.Managed = c.Managed != nil
+			if c.Managed != nil {
+				cert.State = c.Managed.State
+			}
 			for _, user := range c.UsedBy {
 				cert.InUseBy = append(cert.InUseBy, resourcePath(user.Name))
 			}

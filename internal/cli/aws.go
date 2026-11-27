@@ -235,15 +235,15 @@ admit:
 }
 
 // acmFindings turns ACM certificates into findings. A certificate that was
-// never issued, such as one pending validation, has no end date and is left
-// out.
+// never issued, such as one pending validation, has no end date and is
+// unknown; acm.status says why.
 func acmFindings(certs []acm.Certificate, region string, now time.Time, warn time.Duration) []scan.Finding {
 	findings := make([]scan.Finding, 0, len(certs))
 	for _, cert := range certs {
-		if cert.NotAfter == nil {
-			continue
+		f := scan.Unknown(scan.SourceAWSACM, cert.Domain)
+		if cert.NotAfter != nil {
+			f = scan.Expiry(scan.SourceAWSACM, cert.Domain, *cert.NotAfter, now, warn)
 		}
-		f := scan.Expiry(scan.SourceAWSACM, cert.Domain, *cert.NotAfter, now, warn)
 		f.ACM = &scan.ACMInfo{
 			ARN:                cert.ARN,
 			Region:             region,
