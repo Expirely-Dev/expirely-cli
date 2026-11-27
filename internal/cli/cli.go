@@ -158,14 +158,11 @@ func Run(ctx context.Context, args []string, s Streams) int {
 	switch {
 	case args[0] == "tls":
 		return runTLS(ctx, args[1:], s)
-	case args[0] == "aws" || args[0] == "gcp":
-		deprecated(s, "expirely "+args[0], "expirely tls "+args[0])
-		return runTLS(ctx, args, s)
 	case onlyRootFlags(args):
 		return runScan(ctx, args, s)
 	}
-	deprecated(s, "expirely TARGET", "expirely tls TARGET")
-	return runScan(ctx, args, s)
+	c := newCommand(s, args, rootUsage)
+	return c.fail(failf(CodeUnknownCommand, "unknown command %q; did you mean %q?", args[0], "expirely tls "+args[0]))
 }
 
 // runTLS runs expirely tls: a scan of the targets in args, or, when args
@@ -187,8 +184,7 @@ func isHelp(arg string) bool {
 }
 
 // onlyRootFlags reports whether args hold only flags expirely itself
-// takes, such as expirely --version --json, which are not a scan in the
-// old form.
+// takes, such as expirely --version --json.
 func onlyRootFlags(args []string) bool {
 	for _, a := range args {
 		switch a {
@@ -198,18 +194,6 @@ func onlyRootFlags(args []string) bool {
 		}
 	}
 	return true
-}
-
-// deprecated warns on stderr that the command old moved to replacement,
-// as an annotation when expirely runs in GitHub Actions. The old forms
-// stop working in 1.0.
-func deprecated(s Streams, old, replacement string) {
-	msg := fmt.Sprintf("%q is now %q; the old form stops working in expirely 1.0", old, replacement)
-	if s.Getenv != nil && s.Getenv("GITHUB_ACTIONS") == "true" {
-		fmt.Fprintf(s.Stderr, "::warning title=expirely::%s\n", workflowData(msg))
-		return
-	}
-	fmt.Fprintf(s.Stderr, "expirely: %s\n", msg)
 }
 
 // runScan probes the targets named in args and in --file.

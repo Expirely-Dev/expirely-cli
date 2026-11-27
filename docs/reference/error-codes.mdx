@@ -11,7 +11,7 @@ When a scan has several outcomes, 1 wins over 3.
 |---|---|
 | 0 | Every target is `ok`, or `--help` or `--version` ran |
 | 1 | At least one certificate is `expired` or `expiring` |
-| 2 | Usage error: bad flag, invalid target, unreadable `--file` or no targets |
+| 2 | Usage error: unknown command, bad flag, invalid target, unreadable `--file` or no targets |
 | 3 | At least one target could not be read, a certificate's end date is `unknown`, or writing the output failed |
 | 130 | Stopped by Ctrl-C before the end; no results were printed |
 
@@ -26,6 +26,7 @@ Scripts and agents match on `code`; a code is never renamed or reused. Each erro
 | Code | Exit | Meaning |
 |---|---|---|
 | `invalid_flag` | 2 | A flag is unknown or has a bad value. An unknown flag is named as it was typed and, when one is close, followed by the flag meant: `unknown flag -v; did you mean --version?` |
+| `unknown_command` | 2 | The first argument is not a command, such as `expirely example.com` or `expirely aws`, forms removed in 0.10. The message names the command meant: `unknown command "aws"; did you mean "expirely tls aws"?` |
 | `invalid_target` | 2 | A target is not a host, host:port or https:// URL |
 | `missing_arguments` | 2 | No target was given in the arguments or files |
 | `file_unreadable` | 2 | A `--file` could not be opened or read, or has a line over 64 KiB |

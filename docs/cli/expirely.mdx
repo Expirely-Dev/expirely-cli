@@ -29,7 +29,7 @@ Every command reports the same way: the same statuses, the same [JSON report](/r
 
 ## Commands that moved
 
-Before 0.9, `expirely TARGET...`, `expirely aws` and `expirely gcp` were the commands. They still work, and print a warning on stderr, or an annotation in GitHub Actions, that names the command to use instead:
+Before 0.9, `expirely TARGET...`, `expirely aws` and `expirely gcp` were the commands. From 0.10 they exit `2` with `unknown_command`, and the message names the command to use instead:
 
 | Before | Now |
 | --- | --- |
@@ -37,5 +37,3 @@ Before 0.9, `expirely TARGET...`, `expirely aws` and `expirely gcp` were the com
 | `expirely -f targets.txt` | `expirely tls -f targets.txt` |
 | `expirely aws` | `expirely tls aws` |
 | `expirely gcp` | `expirely tls gcp` |
-
-The old forms stop working in expirely 1.0.

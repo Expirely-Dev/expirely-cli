@@ -60,32 +60,46 @@ func TestTLSCommandsRunWithoutWarnings(t *testing.T) {
 	}
 }
 
-func TestOldFormsStillWorkAndSayWhatReplacesThem(t *testing.T) {
+func TestOldFormsAreUnknownCommands(t *testing.T) {
 	tests := []struct {
 		args []string
 		want string
 	}{
-		{[]string{"aws", "--region", "us-east-1"}, `"expirely aws" is now "expirely tls aws"`},
-		{[]string{"-f", "missing.txt"}, `"expirely TARGET" is now "expirely tls TARGET"`},
+		{[]string{"aws", "--region", "us-east-1"}, `unknown command "aws"; did you mean "expirely tls aws"?`},
+		{[]string{"gcp", "--project", "acme"}, `unknown command "gcp"; did you mean "expirely tls gcp"?`},
+		{[]string{"example.com"}, `unknown command "example.com"; did you mean "expirely tls example.com"?`},
+		{[]string{"-f", "targets.txt"}, `unknown command "-f"; did you mean "expirely tls -f"?`},
 	}
 	for _, tt := range tests {
-		_, _, stderr := route(t, nil, tt.args...)
+		code, stdout, stderr := route(t, nil, tt.args...)
 
-		if !strings.HasPrefix(stderr, "expirely: "+tt.want+"; the old form stops working in expirely 1.0\n") {
-			t.Errorf("expirely %q: stderr = %q, want the deprecation first", tt.args, stderr)
+		var got envelope
+		if err := json.Unmarshal([]byte(stderr), &got); err != nil {
+			t.Fatalf("expirely %q: stderr = %q, want the JSON error envelope: %v", tt.args, stderr, err)
 		}
-	}
-
-	code, stdout, _ := route(t, nil, "aws", "--region", "us-east-1", "--json")
-	if code != ExitFindings || !json.Valid([]byte(stdout)) {
-		t.Errorf("expirely aws = %d, stdout %q; want it to run as expirely tls aws, with stdout only the JSON report", code, stdout)
+		if code != ExitUsage || stdout != "" || got.Error.Message != tt.want {
+			t.Errorf("expirely %q = %d, stdout %q, message %q; want exit 2 and %q", tt.args, code, stdout, got.Error.Message, tt.want)
+		}
 	}
 }
 
-func TestOldFormsAnnotateInGitHubActions(t *testing.T) {
-	_, _, stderr := route(t, map[string]string{"GITHUB_ACTIONS": "true", "EXPIRELY_GITHUB": "0"}, "gcp", "--project", "")
+func TestUnknownCommandInJSON(t *testing.T) {
+	code, stdout, stderr := route(t, nil, "aws", "--json")
 
-	if !strings.HasPrefix(stderr, `::warning title=expirely::"expirely gcp" is now "expirely tls gcp"`) {
-		t.Errorf("stderr = %q, want a warning annotation", stderr)
+	var got envelope
+	if err := json.Unmarshal([]byte(stderr), &got); err != nil {
+		t.Fatalf("stderr = %q, want the JSON error envelope: %v", stderr, err)
+	}
+	if code != ExitUsage || stdout != "" || got.Error.Code != CodeUnknownCommand || got.Error.Remediation != remediations[CodeUnknownCommand] {
+		t.Errorf("expirely aws --json = %d, stdout %q, error %+v; want exit 2 and code unknown_command with its remediation", code, stdout, got.Error)
+	}
+}
+
+func TestUnknownCommandGivesAnAgentTheRootHelp(t *testing.T) {
+	_, _, stderr := route(t, map[string]string{"AI_AGENT": "claude-code"}, "example.com")
+
+	var got envelope
+	if err := json.Unmarshal([]byte(stderr), &got); err != nil || got.Error.Usage != rootUsage {
+		t.Errorf("stderr = %q, want the envelope with the root help in usage", stderr)
 	}
 }
