@@ -24,7 +24,8 @@ import (
 
 // Exit codes returned by Run, in order of precedence when a scan has
 // several outcomes: ExitFindings when any certificate is expired or
-// expiring, then ExitFailure when any target could not be read.
+// expiring, then ExitFailure when any target could not be read or a cloud
+// command could not read every region.
 // ExitInterrupted, 128 plus SIGINT as shells report it, means the run was
 // stopped before it ended and printed no results.
 const (

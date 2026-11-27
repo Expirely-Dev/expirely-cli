@@ -126,7 +126,7 @@ func TestLimitKeepsTheMostUrgentAndSaysSo(t *testing.T) {
 func TestCountsComeBeforeTheResults(t *testing.T) {
 	_, stdout, _ := run(t, false, threeTargets(t)...)
 
-	keys := []string{`"schema_version"`, `"summary"`, `"filter"`, `"matched"`, `"truncated"`, `"results"`}
+	keys := []string{`"schema_version"`, `"summary"`, `"filter"`, `"matched"`, `"truncated"`, `"unreadable"`, `"results"`}
 	last := -1
 	for _, k := range keys {
 		i := strings.Index(stdout, k)
@@ -137,6 +137,9 @@ func TestCountsComeBeforeTheResults(t *testing.T) {
 	}
 	if !strings.Contains(stdout, `"truncated":false`) || !strings.Contains(stdout, `"limit":null`) {
 		t.Errorf("stdout = %s, want truncated and limit present without --limit", stdout)
+	}
+	if !strings.Contains(stdout, `"unreadable":[]`) {
+		t.Errorf("stdout = %s, want unreadable present and empty for a complete report", stdout)
 	}
 }
 

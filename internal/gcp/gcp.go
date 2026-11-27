@@ -16,6 +16,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -99,24 +100,43 @@ func (e *APIError) Disabled() bool {
 	return e.Reason == "SERVICE_DISABLED" || e.Reason == "BILLING_DISABLED"
 }
 
+// Listing is what List read from a project. Unreachable names each place
+// Google could not read, as source:location such as "compute:us-east7" or
+// "certificate_manager:us-east1"; Certificates then lacks whatever that
+// place holds.
+type Listing struct {
+	Certificates []Certificate
+	Unreachable  []string
+}
+
 // List returns every certificate of project: the Compute SSL certificates,
-// then the Certificate Manager ones. A project with Certificate Manager
-// disabled has none there, which is not an error; a project with Compute
-// disabled is, since it serves no load balancer at all.
-func List(ctx context.Context, svc *Service, project string) ([]Certificate, error) {
-	certs, err := computeCertificates(ctx, svc, project)
-	if err != nil {
-		return nil, err
+// then the Certificate Manager ones. A region or location Google cannot
+// reach is listed in Unreachable rather than failing the whole listing. A
+// project with Certificate Manager disabled has none there, which is not an
+// error; a project with Compute disabled is, since it serves no load
+// balancer at all.
+func List(ctx context.Context, svc *Service, project string) (Listing, error) {
+	var l Listing
+	if err := computeCertificates(ctx, svc, project, &l); err != nil {
+		return Listing{}, err
 	}
-	managed, err := managerCertificates(ctx, svc, project)
+	err := managerCertificates(ctx, svc, project, &l)
 	var apiErr *APIError
-	if errors.As(err, &apiErr) && apiErr.Reason == "SERVICE_DISABLED" {
-		return certs, nil
+	if err != nil && (!errors.As(err, &apiErr) || apiErr.Reason != "SERVICE_DISABLED") {
+		return Listing{}, err
 	}
-	if err != nil {
-		return nil, err
+	slices.Sort(l.Unreachable)
+	l.Unreachable = slices.Compact(l.Unreachable)
+	return l, nil
+}
+
+// unreachable records places, as Google names them, that source could not
+// read, by location alone: "regions/us-east7" and
+// "projects/p/locations/us-east1" become "us-east7" and "us-east1".
+func (l *Listing) unreachable(source string, places []string) {
+	for _, p := range places {
+		l.Unreachable = append(l.Unreachable, source+":"+p[strings.LastIndex(p, "/")+1:])
 	}
-	return append(certs, managed...), nil
 }
 
 type sslCertificate struct {
@@ -135,20 +155,25 @@ type proxy struct {
 	SslCertificates []string `json:"sslCertificates"`
 }
 
-func computeCertificates(ctx context.Context, svc *Service, project string) ([]Certificate, error) {
-	users, err := proxyUsers(ctx, svc, project)
+// partial makes an aggregated list answer with what it could read and name
+// the regions it could not, as Google recommends, instead of failing whole.
+const partial = "?returnPartialSuccess=true"
+
+func computeCertificates(ctx context.Context, svc *Service, project string, l *Listing) error {
+	users, err := proxyUsers(ctx, svc, project, l)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	var certs []Certificate
-	err = list(ctx, svc.Client, computeURL(svc, project, "aggregated/sslCertificates"), func(p struct {
+	err = list(ctx, svc.Client, computeURL(svc, project, "aggregated/sslCertificates"+partial), func(p struct {
 		paged
-		Items map[string]struct {
+		Unreachables []string `json:"unreachables"`
+		Items        map[string]struct {
 			SslCertificates []sslCertificate `json:"sslCertificates"`
 		} `json:"items"`
 	}) error {
-		for scope, l := range p.Items {
-			for _, c := range l.SslCertificates {
+		l.unreachable(SourceCompute, p.Unreachables)
+		for scope, items := range p.Items {
+			for _, c := range items.SslCertificates {
 				domains := c.SANs
 				if len(domains) == 0 && c.Managed != nil {
 					domains = c.Managed.Domains
@@ -161,20 +186,21 @@ func computeCertificates(ctx context.Context, svc *Service, project string) ([]C
 				cert.Source = SourceCompute
 				cert.Managed = c.Type == "MANAGED"
 				cert.InUseBy = users[resourcePath(c.SelfLink)]
-				certs = append(certs, cert)
+				l.Certificates = append(l.Certificates, cert)
 			}
 		}
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("list SSL certificates: %w", err)
+		return fmt.Errorf("list SSL certificates: %w", err)
 	}
-	return certs, nil
+	return nil
 }
 
 // proxyUsers maps each Compute SSL certificate, by resource path, to the
-// target HTTPS and SSL proxies that list it.
-func proxyUsers(ctx context.Context, svc *Service, project string) (map[string][]string, error) {
+// target HTTPS and SSL proxies that list it. A region it cannot reach goes
+// to l's Unreachable, since a certificate there may be in use.
+func proxyUsers(ctx context.Context, svc *Service, project string, l *Listing) (map[string][]string, error) {
 	users := map[string][]string{}
 	add := func(proxies []proxy) {
 		for _, p := range proxies {
@@ -183,14 +209,16 @@ func proxyUsers(ctx context.Context, svc *Service, project string) (map[string][
 			}
 		}
 	}
-	err := list(ctx, svc.Client, computeURL(svc, project, "aggregated/targetHttpsProxies"), func(p struct {
+	err := list(ctx, svc.Client, computeURL(svc, project, "aggregated/targetHttpsProxies"+partial), func(p struct {
 		paged
-		Items map[string]struct {
+		Unreachables []string `json:"unreachables"`
+		Items        map[string]struct {
 			TargetHTTPSProxies []proxy `json:"targetHttpsProxies"`
 		} `json:"items"`
 	}) error {
-		for _, l := range p.Items {
-			add(l.TargetHTTPSProxies)
+		l.unreachable(SourceCompute, p.Unreachables)
+		for _, items := range p.Items {
+			add(items.TargetHTTPSProxies)
 		}
 		return nil
 	})
@@ -223,9 +251,10 @@ type managerCertificate struct {
 }
 
 // managerCertificates lists the project's Certificate Manager locations,
-// then the certificates of each, locationConcurrency locations at a time.
-// The first failure stops the calls not yet made and is the error returned.
-func managerCertificates(ctx context.Context, svc *Service, project string) ([]Certificate, error) {
+// then the certificates of each, locationConcurrency locations at a time,
+// into l. The first failure stops the calls not yet made and is the error
+// returned.
+func managerCertificates(ctx context.Context, svc *Service, project string, l *Listing) error {
 	var locations []string
 	err := list(ctx, svc.Client, managerURL(svc, "projects/"+url.PathEscape(project)+"/locations"), func(p struct {
 		paged
@@ -239,12 +268,12 @@ func managerCertificates(ctx context.Context, svc *Service, project string) ([]C
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("list Certificate Manager locations: %w", err)
+		return fmt.Errorf("list Certificate Manager locations: %w", err)
 	}
 
 	ctx, cancel := context.WithCancelCause(ctx)
 	defer cancel(nil)
-	byLocation := make([][]Certificate, len(locations))
+	byLocation := make([]Listing, len(locations))
 	sem := make(chan struct{}, locationConcurrency)
 	var wg sync.WaitGroup
 admit:
@@ -259,32 +288,34 @@ admit:
 		}
 		wg.Go(func() {
 			defer func() { <-sem }()
-			certs, err := managerLocation(ctx, svc, project, loc)
+			found, err := managerLocation(ctx, svc, project, loc)
 			if err != nil {
 				cancel(fmt.Errorf("list Certificate Manager certificates in %s: %w", loc, err))
 				return
 			}
-			byLocation[i] = certs
+			byLocation[i] = found
 		})
 	}
 	wg.Wait()
 	if ctx.Err() != nil {
-		return nil, context.Cause(ctx)
+		return context.Cause(ctx)
 	}
-	var certs []Certificate
-	for _, l := range byLocation {
-		certs = append(certs, l...)
+	for _, found := range byLocation {
+		l.Certificates = append(l.Certificates, found.Certificates...)
+		l.Unreachable = append(l.Unreachable, found.Unreachable...)
 	}
-	return certs, nil
+	return nil
 }
 
-func managerLocation(ctx context.Context, svc *Service, project, location string) ([]Certificate, error) {
-	var certs []Certificate
+func managerLocation(ctx context.Context, svc *Service, project, location string) (Listing, error) {
+	var l Listing
 	u := managerURL(svc, "projects/"+url.PathEscape(project)+"/locations/"+url.PathEscape(location)+"/certificates")
 	err := list(ctx, svc.Client, u, func(p struct {
 		paged
+		Unreachable  []string             `json:"unreachable"`
 		Certificates []managerCertificate `json:"certificates"`
 	}) error {
+		l.unreachable(SourceCertificateManager, p.Unreachable)
 		for _, c := range p.Certificates {
 			domains := c.SANs
 			if len(domains) == 0 && c.Managed != nil {
@@ -300,11 +331,11 @@ func managerLocation(ctx context.Context, svc *Service, project, location string
 			for _, user := range c.UsedBy {
 				cert.InUseBy = append(cert.InUseBy, resourcePath(user.Name))
 			}
-			certs = append(certs, cert)
+			l.Certificates = append(l.Certificates, cert)
 		}
 		return nil
 	})
-	return certs, err
+	return l, err
 }
 
 // certificate builds the fields both APIs share: the domain is the first
@@ -347,7 +378,11 @@ func list[P interface{ next() string }](ctx context.Context, client *http.Client
 	for token := ""; ; {
 		pageURL := u
 		if token != "" {
-			pageURL += "?pageToken=" + url.QueryEscape(token)
+			sep := "?"
+			if strings.Contains(u, "?") {
+				sep = "&"
+			}
+			pageURL += sep + "pageToken=" + url.QueryEscape(token)
 		}
 		body, err := get(ctx, client, pageURL)
 		if err != nil {

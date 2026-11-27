@@ -14,6 +14,7 @@ expirely prints this report when `--json` is set or stdout is not a terminal. Th
   "filter": { "status": ["expired", "expiring", "error", "ok"], "limit": null },
   "matched": 1,
   "truncated": false,
+  "unreadable": [],
   "results": [
     {
       "target": "expired.badssl.com:443",
@@ -48,6 +49,7 @@ expirely prints this report when `--json` is set or stdout is not a terminal. Th
 | `filter` | What the report shows: `status`, the statuses shown, most urgent first, and `limit`, the `--limit` value or `null` |
 | `matched` | How many results have a status in `filter.status`, before `--limit` |
 | `truncated` | `true` when `--limit` left out some of the `matched` results; always present |
+| `unreadable` | Places a cloud command could not read, as `source:location` such as `compute:us-east7`, so `results` may lack certificates kept there. Empty when the report is complete, and always empty for a scan of targets and for `expirely aws`, which reads one region. A non-empty list makes the run exit `3` unless a result already makes it exit `1` |
 | `results` | The results shown, most urgent first |
 
 The counts come before `results`, so a reader that sees only the start of a long report, as an agent shown the head of a command's output does, still knows how many results there are and whether it has them all.

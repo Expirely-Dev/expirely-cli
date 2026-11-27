@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"sort"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -36,10 +37,10 @@ func TestListReadsComputeCertificatesAndTheirProxies(t *testing.T) {
 		t.Fatalf("List() error = %v", err)
 	}
 
-	if len(got) != 6 {
-		t.Fatalf("len(certificates) = %d, want 4 from Compute and 2 from Certificate Manager", len(got))
+	if len(got.Certificates) != 6 || len(got.Unreachable) != 0 {
+		t.Fatalf("List() = %d certificates, unreachable %v; want 4 from Compute, 2 from Certificate Manager, none unreachable", len(got.Certificates), got.Unreachable)
 	}
-	certs := byName(got)
+	certs := byName(got.Certificates)
 	api := certs["api-cert"]
 	sort.Strings(api.InUseBy)
 	if api.Domain != "api.example.com" || api.Managed || api.Location != "global" || api.Source != SourceCompute || len(api.InUseBy) != 2 ||
@@ -68,7 +69,7 @@ func TestListReadsCertificateManagerInEveryLocation(t *testing.T) {
 		t.Fatalf("List() error = %v", err)
 	}
 
-	certs := byName(got)
+	certs := byName(got.Certificates)
 	shop := certs["shop-cm"]
 	if shop.Source != SourceCertificateManager || shop.Domain != "shop.example.com" || !shop.Managed || shop.Location != "global" ||
 		len(shop.InUseBy) != 1 || shop.InUseBy[0] != "projects/acme-prod/locations/global/certificateMaps/main/certificateMapEntries/shop" {
@@ -87,8 +88,8 @@ func TestListWithCertificateManagerDisabled(t *testing.T) {
 
 	got, err := List(context.Background(), svc, "acme-prod")
 
-	if err != nil || len(got) != 4 {
-		t.Fatalf("List() = %d certificates, %v; want the 4 Compute ones and no error", len(got), err)
+	if err != nil || len(got.Certificates) != 4 {
+		t.Fatalf("List() = %d certificates, %v; want the 4 Compute ones and no error", len(got.Certificates), err)
 	}
 }
 
@@ -109,6 +110,9 @@ func TestListFollowsPageTokens(t *testing.T) {
 	var calls atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
+		if r.URL.Query().Get("returnPartialSuccess") != "true" {
+			t.Errorf("query = %q, want returnPartialSuccess kept on every page", r.URL.RawQuery)
+		}
 		if r.URL.Query().Get("pageToken") == "p2" {
 			_, _ = w.Write([]byte(`{"items":[{"selfLink":"b"}]}`))
 			return
@@ -118,7 +122,7 @@ func TestListFollowsPageTokens(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	var links []string
-	err := list(context.Background(), srv.Client(), srv.URL+"/projects/x/global/targetSslProxies", func(p struct {
+	err := list(context.Background(), srv.Client(), srv.URL+"/projects/x/aggregated/targetHttpsProxies"+partial, func(p struct {
 		paged
 		Items []proxy `json:"items"`
 	}) error {
@@ -157,5 +161,47 @@ func TestListReturnsAPIErrors(t *testing.T) {
 				t.Errorf("Reason = %q, Disabled() = %v; want %q, %v", apiErr.Reason, apiErr.Disabled(), tt.reason, tt.wantDisabled)
 			}
 		})
+	}
+}
+
+type queryRecorder struct {
+	mu      sync.Mutex
+	queries map[string]string
+}
+
+func (q *queryRecorder) RoundTrip(r *http.Request) (*http.Response, error) {
+	q.mu.Lock()
+	q.queries[r.URL.Path] = r.URL.RawQuery
+	q.mu.Unlock()
+	return http.DefaultTransport.RoundTrip(r)
+}
+
+func TestListKeepsWhatItReadAndNamesWhatItCouldNot(t *testing.T) {
+	bodies := gcptest.Sample("acme-prod")
+	certs := bodies["aggregated/sslCertificates"].(map[string]any)
+	certs["unreachables"] = []string{"regions/us-east7"}
+	proxies := bodies["aggregated/targetHttpsProxies"].(map[string]any)
+	proxies["unreachables"] = []string{"regions/us-east7", "regions/asia-south2"}
+	bodies["locations/global/certificates"].(map[string]any)["unreachable"] = []string{"projects/acme-prod/locations/europe-west9"}
+	e := gcptest.Serve(t, "acme-prod", gcptest.Fake{Bodies: bodies})
+	rec := &queryRecorder{queries: map[string]string{}}
+	svc := &Service{Client: &http.Client{Transport: rec}, ComputeEndpoint: e.Compute, CertificateManagerEndpoint: e.CertificateManager}
+
+	got, err := List(context.Background(), svc, "acme-prod")
+	if err != nil {
+		t.Fatalf("List() error = %v", err)
+	}
+
+	if len(got.Certificates) != 6 {
+		t.Errorf("len(certificates) = %d, want the 6 that were read", len(got.Certificates))
+	}
+	want := "certificate_manager:europe-west9,compute:asia-south2,compute:us-east7"
+	if strings.Join(got.Unreachable, ",") != want {
+		t.Errorf("Unreachable = %v, want %s, sorted and once each", got.Unreachable, want)
+	}
+	for _, path := range []string{"/compute/v1/projects/acme-prod/aggregated/sslCertificates", "/compute/v1/projects/acme-prod/aggregated/targetHttpsProxies"} {
+		if q := rec.queries[path]; q != "returnPartialSuccess=true" {
+			t.Errorf("query of %s = %q, want returnPartialSuccess=true", path, q)
+		}
 	}
 }

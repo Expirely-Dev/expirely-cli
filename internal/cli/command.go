@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/bycavii/expirely-cli/internal/scan"
@@ -142,7 +143,9 @@ func (c *command) writeJSON(v any) int {
 
 // report prints r, in JSON or as text with the time the work took, and
 // returns the exit code every result calls for, shown or not: --status,
-// --limit and --fields change what is printed, never what fails.
+// --limit and --fields change what is printed, never what fails. A report
+// with places it could not read is incomplete, so it exits as a result
+// that could not be read does; text names those places on stderr.
 func (c *command) report(r report, elapsed time.Duration) int {
 	if c.json {
 		if code := c.writeJSON(r); code != ExitOK {
@@ -150,8 +153,15 @@ func (c *command) report(r report, elapsed time.Duration) int {
 		}
 	} else {
 		writeText(c.Style.Writer(c.Stdout), c.Style, r, elapsed)
+		if len(r.Unreadable) > 0 {
+			fmt.Fprintf(c.Stderr, "expirely: could not read %s; certificates kept there are missing from these results\n", ui.Clean(strings.Join(r.Unreadable, ", ")))
+		}
 	}
-	return exitCode(r.all)
+	code := exitCode(r.all)
+	if code == ExitOK && len(r.Unreadable) > 0 {
+		return ExitFailure
+	}
+	return code
 }
 
 // envelope is the JSON a command error prints on stderr. Usage holds the

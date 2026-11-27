@@ -157,3 +157,65 @@ func TestGCPFindings(t *testing.T) {
 		t.Errorf("findings[0] = %+v, gcp = %+v; want an expiring self-managed certificate, an empty in_use_by and no trust fields", f, f.GCP)
 	}
 }
+
+func oneGCPCert(expires time.Time, unreachable ...string) gcptest.Fake {
+	sslCertificates := map[string]any{
+		"items": map[string]any{"global": map[string]any{"sslCertificates": []any{
+			map[string]any{"name": "api-cert", "type": "SELF_MANAGED", "subjectAlternativeNames": []string{"api.example.com"}, "expireTime": expires.UTC().Format(time.RFC3339)},
+		}}},
+	}
+	if len(unreachable) > 0 {
+		sslCertificates["unreachables"] = unreachable
+	}
+	return gcptest.Fake{Bodies: map[string]any{
+		"aggregated/sslCertificates":    sslCertificates,
+		"aggregated/targetHttpsProxies": nil,
+		"global/targetSslProxies":       nil,
+		"locations":                     nil,
+	}}
+}
+
+func TestGCPReportsWhatItCouldNotRead(t *testing.T) {
+	inAYear := time.Now().AddDate(1, 0, 0)
+	t.Run("json", func(t *testing.T) {
+		code, stdout, stderr := runGCPWith(t, false, oneGCPCert(inAYear, "regions/us-east7"), nil, "--project", "acme-prod")
+
+		var got struct {
+			Unreadable []string          `json:"unreadable"`
+			Results    []json.RawMessage `json:"results"`
+		}
+		if err := json.Unmarshal([]byte(stdout), &got); err != nil {
+			t.Fatalf("stdout is not the JSON report: %v\nstderr: %s", err, stderr)
+		}
+		if len(got.Unreadable) != 1 || got.Unreadable[0] != "compute:us-east7" || len(got.Results) != 1 {
+			t.Errorf("unreadable = %v with %d results, want compute:us-east7 and the certificate read", got.Unreadable, len(got.Results))
+		}
+		if code != ExitFailure {
+			t.Errorf("exit code = %d, want %d: the certificate read is ok, but the report is incomplete", code, ExitFailure)
+		}
+	})
+	t.Run("text", func(t *testing.T) {
+		code, stdout, stderr := runGCPWith(t, true, oneGCPCert(inAYear, "regions/us-east7"), nil, "--project", "acme-prod")
+
+		if !strings.Contains(stderr, "could not read compute:us-east7") {
+			t.Errorf("stderr = %q, want the place it could not read", stderr)
+		}
+		if !strings.Contains(stdout, "api.example.com") || code != ExitFailure {
+			t.Errorf("exit code = %d, stdout = %q; want the certificate read and exit %d", code, stdout, ExitFailure)
+		}
+	})
+	t.Run("findings still exit 1", func(t *testing.T) {
+		code, _, stderr := runGCPWith(t, false, oneGCPCert(time.Now().AddDate(0, 0, 5), "regions/us-east7"), nil, "--project", "acme-prod")
+
+		if code != ExitFindings {
+			t.Errorf("exit code = %d, want %d for an expiring certificate even with a region unread; stderr = %s", code, ExitFindings, stderr)
+		}
+	})
+	t.Run("complete report exits 0", func(t *testing.T) {
+		code, stdout, stderr := runGCPWith(t, false, oneGCPCert(inAYear), nil, "--project", "acme-prod")
+
+		if code != ExitOK || !strings.Contains(stdout, `"unreadable":[]`) {
+			t.Errorf("exit code = %d, stdout = %s, stderr = %s; want 0 and an empty unreadable", code, stdout, stderr)
+		}
+	})
+}

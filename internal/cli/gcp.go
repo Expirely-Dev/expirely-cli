@@ -40,7 +40,9 @@ Output
 
 expirely gcp signs in with Application Default Credentials, lists the Compute
 SSL certificates with their target proxies and the Certificate Manager
-certificates in every location, and changes nothing.
+certificates in every location, and changes nothing. A region Google cannot
+reach is listed in unreadable, and the run exits 3 unless a certificate
+it read exits 1.
 `
 
 // runGCP lists the certificates of one Google Cloud project and reports
@@ -83,7 +85,7 @@ func runGCP(ctx context.Context, args []string, s Streams) int {
 	start := time.Now()
 	readCtx, cancel := context.WithTimeout(ctx, w.timeout)
 	stop := c.waiting("Reading the certificates of project " + *project)
-	certs, err := gcp.List(readCtx, svc, *project)
+	listing, err := gcp.List(readCtx, svc, *project)
 	stop()
 	cancel()
 	if ctx.Err() != nil {
@@ -93,7 +95,9 @@ func runGCP(ctx context.Context, args []string, s Streams) int {
 		return c.fail(gcpError(err))
 	}
 	now := time.Now()
-	return c.report(newReport(now, w.warnDays, gcpFindings(certs, now, w.warn()), v), time.Since(start))
+	r := newReport(now, w.warnDays, gcpFindings(listing.Certificates, now, w.warn()), v)
+	r.Unreadable = orEmpty(listing.Unreachable)
+	return c.report(r, time.Since(start))
 }
 
 // gcpFindings turns a project's certificates into findings. A managed

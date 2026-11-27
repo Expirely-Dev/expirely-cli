@@ -17,7 +17,7 @@ expirely -f targets.txt | jq '.summary'
 { "error": 0, "expired": 1, "expiring": 0, "ok": 3, "total": 4 }
 ```
 
-Every field is described in [Output](/reference/output). A value that could not be read is `null`, never zero or a default date. The report starts with `summary`, `filter`, `matched` and `truncated`, so an agent that reads only the first lines of a long scan still sees the counts and whether it has every result, and it leaves each certificate chain out unless `--details` asks for it.
+Every field is described in [Output](/reference/output). A value that could not be read is `null`, never zero or a default date. The report starts with `summary`, `filter`, `matched`, `truncated` and `unreadable`, so an agent that reads only the first lines of a long scan still sees the counts and whether it has every result, and it leaves each certificate chain out unless `--details` asks for it.
 
 ## Show only what needs attention
 

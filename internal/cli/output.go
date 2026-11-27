@@ -18,7 +18,9 @@ import (
 // Matched counts those whose status the view shows, and Truncated is true
 // when --limit left some of them out of Results. The counts come before
 // Results, so a reader that only sees the start of the output still knows
-// what it is missing.
+// what it is missing. Unreadable names the places a cloud command could
+// not read, so Results may lack certificates kept there; it is empty for a
+// complete report.
 type report struct {
 	SchemaVersion int            `json:"schema_version"`
 	ScannedAt     time.Time      `json:"scanned_at"`
@@ -27,6 +29,7 @@ type report struct {
 	Filter        reportFilter   `json:"filter"`
 	Matched       int            `json:"matched"`
 	Truncated     bool           `json:"truncated"`
+	Unreadable    []string       `json:"unreadable"`
 	Results       []scan.Finding `json:"results"`
 
 	all    []scan.Finding
@@ -97,6 +100,7 @@ func newReport(now time.Time, warnDays int, findings []scan.Finding, v *view) re
 		Summary:       summary,
 		Filter:        reportFilter{Status: statuses},
 		Matched:       len(shown),
+		Unreadable:    []string{},
 		Results:       shown,
 		all:           findings,
 		fields:        v.fields,
