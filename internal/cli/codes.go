@@ -35,7 +35,7 @@ var remediations = map[string]string{
 	CodeAWSAccessDenied:    "The credentials were refused, expired or lack acm:ListCertificates and acm:DescribeCertificate in this account and region.",
 	CodeAWSRequestFailed:   "ACM did not answer as expected; the message has its reason, and a later run or a longer --timeout often succeeds.",
 	CodeGCPNotConfigured:   "expirely gcp reads the project from --project, GOOGLE_CLOUD_PROJECT or CLOUDSDK_CORE_PROJECT and signs in with Application Default Credentials, as gcloud auth application-default login sets up.",
-	CodeGCPAccessDenied:    "The credentials were refused or lack compute.sslCertificates.list, compute.targetHttpsProxies.list and compute.targetSslProxies.list in this project.",
+	CodeGCPAccessDenied:    "The credentials were refused or lack compute.sslCertificates.list, compute.targetHttpsProxies.list, compute.targetSslProxies.list, certificatemanager.locations.list or certificatemanager.certs.list in this project.",
 	CodeGCPComputeDisabled: "Google Cloud reports the Compute Engine API or billing disabled in this project, so the project serves no Compute SSL certificates.",
 	CodeGCPRequestFailed:   "Google Cloud did not answer as expected; the message has its reason, and a later run or a longer --timeout often succeeds.",
 	CodeInterrupted:        "The run was stopped, as Ctrl-C does, before it ended; it printed no results, since partial ones would read as complete.",

@@ -26,7 +26,7 @@ func runGCPWith(t *testing.T, terminal bool, f gcptest.Fake, env map[string]stri
 		StdoutIsTerminal: terminal,
 		Getenv:           envOf(env),
 		NewGCP: func(context.Context) (*gcp.Service, error) {
-			return &gcp.Service{Client: http.DefaultClient, Endpoint: endpoint}, nil
+			return &gcp.Service{Client: http.DefaultClient, ComputeEndpoint: endpoint.Compute, CertificateManagerEndpoint: endpoint.CertificateManager}, nil
 		},
 	})
 	return code, out.String(), errOut.String()
@@ -45,6 +45,9 @@ func TestGCPText(t *testing.T) {
 		"renews itself",
 		"internal.example.com",
 		"self-managed, in use by 1 resource",
+		"shop.example.com",
+		"legacy.example.com",
+		"self-managed, not in use",
 	} {
 		if !strings.Contains(stdout, want) {
 			t.Errorf("stdout = %q, want it to contain %q", stdout, want)
@@ -67,13 +70,21 @@ func TestGCPJSONAndProjectFromEnvironment(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout), &got); err != nil {
 		t.Fatalf("stdout is not the JSON report: %v\nstderr: %s", err, stderr)
 	}
-	if len(got.Results) != 3 {
-		t.Fatalf("len(results) = %d, want 3 issued certificates", len(got.Results))
+	if len(got.Results) != 5 {
+		t.Fatalf("len(results) = %d, want 5 issued certificates", len(got.Results))
 	}
+	sources := map[string]int{}
 	for _, r := range got.Results {
-		if len(r.GCP) == 0 {
-			t.Errorf("result %s has no gcp object", r.Target)
+		var info struct {
+			Source string `json:"source"`
 		}
+		if err := json.Unmarshal(r.GCP, &info); err != nil || info.Source == "" {
+			t.Errorf("result %s has gcp %s, want an object with its source", r.Target, r.GCP)
+		}
+		sources[info.Source]++
+	}
+	if sources["compute"] != 3 || sources["certificate_manager"] != 2 {
+		t.Errorf("sources = %v, want 3 compute and 2 certificate_manager", sources)
 	}
 }
 

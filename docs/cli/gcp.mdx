@@ -1,9 +1,9 @@
 ---
 title: expirely gcp
-description: List the SSL certificates of a Google Cloud project and when they expire.
+description: List the certificates of a Google Cloud project and when they expire.
 ---
 
-`expirely gcp` reads every Compute Engine SSL certificate of one Google Cloud project, global and regional, which the external and internal Application Load Balancers and proxy Network Load Balancers serve. It reports each one the way a scan reports a target, and counts the target HTTPS and SSL proxies that serve it. It only lists and changes nothing.
+`expirely gcp` reads every certificate one Google Cloud project's load balancers can serve: the Compute Engine SSL certificates, global and regional, and the certificates in Certificate Manager, in every location. It reports each one the way a scan reports a target, and counts the resources that use it. It only lists and changes nothing.
 
 ```sh
 expirely gcp --project acme-production
@@ -29,13 +29,17 @@ gcloud auth application-default login
 
 In CI, a service account through Workload Identity Federation or `GOOGLE_APPLICATION_CREDENTIALS` works the same way. The project is not read from the active `gcloud` configuration; pass `--project` or set `GOOGLE_CLOUD_PROJECT`.
 
+expirely asks for the `cloud-platform` OAuth scope, the only one Certificate Manager accepts. The scope does not grant anything by itself: the IAM roles below decide what the credentials can read.
+
 ## Self-managed certificates
 
-Google renews a managed certificate. It never renews a self-managed one, which someone uploaded and must replace before it expires. Each line says which kind it is and, for a self-managed one, how many proxies serve it:
+Google renews a managed certificate. It never renews a self-managed one, which someone uploaded and must replace before it expires. Each line says which kind it is and, for a self-managed one, how many resources use it: target HTTPS and SSL proxies for a Compute certificate, certificate map entries and other resources for a Certificate Manager one.
 
 ```
   expiring  api.example.com       12 days   Dec 08 2026  self-managed, in use by 2 resources
+  expiring  legacy.example.com    5 days    Dec 01 2026  self-managed, not in use
   ok        www.example.com       61 days   Jan 26 2027  renews itself
+  ok        shop.example.com      67 days   Feb 01 2027  renews itself
   ok        internal.example.com  203 days  Jun 17 2027  self-managed, in use by 1 resource
 ```
 
@@ -43,27 +47,30 @@ A self-managed certificate in use is highlighted and listed first within its sta
 
 ## Permissions
 
-`expirely gcp` calls three list methods. The read-only role `roles/compute.viewer` includes them, and a custom role needs only these:
+`expirely gcp` calls five list methods. The read-only roles `roles/compute.viewer` and `roles/certificatemanager.viewer` include them, and a custom role needs only these:
 
 ```text
 compute.sslCertificates.list
 compute.targetHttpsProxies.list
 compute.targetSslProxies.list
+certificatemanager.locations.list
+certificatemanager.certs.list
 ```
+
+A project with the Certificate Manager API disabled has no certificates there, so expirely reports its Compute certificates alone.
 
 ## Output
 
 The JSON report is the one in [Output](/reference/output). Each result has a `gcp` object and no trust fields, since Google Cloud does not verify the chain for a host:
 
-| Field           | Meaning                                                                  |
-| --------------- | ------------------------------------------------------------------------ |
-| `gcp.name`      | The SSL certificate's name in the project                                |
-| `gcp.location`  | `global`, or the region of a regional certificate                        |
-| `gcp.managed`   | `true` for a certificate Google renews                                   |
-| `gcp.in_use_by` | The target HTTPS and SSL proxies that serve it; empty when none do       |
-
-Certificates in Certificate Manager are not read yet.
+| Field           | Meaning                                                                               |
+| --------------- | ------------------------------------------------------------------------------------- |
+| `gcp.name`      | The certificate's name in the project                                                 |
+| `gcp.location`  | `global`, or the region of a regional certificate                                     |
+| `gcp.source`    | `compute` for a Compute SSL certificate, `certificate_manager` for a Certificate Manager one |
+| `gcp.managed`   | `true` for a certificate Google renews                                                |
+| `gcp.in_use_by` | The resources that use it, as paths from `projects/`; empty when none do              |
 
 ## Exit codes
 
-The same as a scan: `0` when every certificate is `ok`, `1` when one is `expired` or `expiring`. A missing project or credentials exit `2` with `gcp_not_configured`; refused credentials or missing permissions exit `3` with `gcp_access_denied`; a project with the Compute Engine API or billing disabled exits `3` with `gcp_compute_disabled`, since it serves no Compute SSL certificates; and any other Google Cloud failure exits `3` with `gcp_request_failed`. Each code is in [Error codes](/reference/error-codes).
+The same as a scan: `0` when every certificate is `ok`, `1` when one is `expired` or `expiring`. A missing project or credentials exit `2` with `gcp_not_configured`; refused credentials or missing permissions exit `3` with `gcp_access_denied`; a project with the Compute Engine API or billing disabled exits `3` with `gcp_compute_disabled`, since it serves no load balancer; and any other Google Cloud failure exits `3` with `gcp_request_failed`. Each code is in [Error codes](/reference/error-codes).

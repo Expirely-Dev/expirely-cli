@@ -86,11 +86,14 @@ type Finding struct {
 	GCP *GCPInfo `json:"gcp,omitempty"`
 }
 
-// GCPInfo is what Google Cloud says about one of a project's SSL
-// certificates. Managed is true for a certificate Google renews.
+// GCPInfo is what Google Cloud says about one of a project's
+// certificates. Source is "compute" for a Compute SSL certificate and
+// "certificate_manager" for one in Certificate Manager. Managed is true for
+// a certificate Google renews.
 type GCPInfo struct {
 	Name     string   `json:"name"`
 	Location string   `json:"location"`
+	Source   string   `json:"source"`
 	Managed  bool     `json:"managed"`
 	InUseBy  []string `json:"in_use_by"`
 }

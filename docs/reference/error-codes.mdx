@@ -34,7 +34,7 @@ Scripts and agents match on `code`; a code is never renamed or reused. Each erro
 | `aws_access_denied` | 3 | AWS refused the credentials, they expired, or they lack the ACM read permissions |
 | `aws_request_failed` | 3 | Another AWS failure, such as a timeout or a throttled request |
 | `gcp_not_configured` | 2 | `expirely gcp` found no project, or no Application Default Credentials |
-| `gcp_access_denied` | 3 | Google Cloud refused the credentials, or they lack the Compute list permissions |
+| `gcp_access_denied` | 3 | Google Cloud refused the credentials, or they lack the Compute or Certificate Manager list permissions |
 | `gcp_compute_disabled` | 3 | The project has the Compute Engine API or billing disabled, so it serves no Compute SSL certificates |
 | `gcp_request_failed` | 3 | Another Google Cloud failure, such as a timeout or a server error |
 | `interrupted` | 130 | The run was stopped, as Ctrl-C does, before it ended; it printed no results, since partial ones would read as complete |

@@ -83,7 +83,7 @@ Usage
 
 Commands
   expirely aws            list the certificates in AWS Certificate Manager; see expirely aws --help
-  expirely gcp            list the SSL certificates of a Google Cloud project; see expirely gcp --help
+  expirely gcp            list the certificates of a Google Cloud project; see expirely gcp --help
 
 Examples
   expirely example.com api.example.com:8443

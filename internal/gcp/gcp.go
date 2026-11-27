@@ -1,63 +1,86 @@
 // Package gcp reads the certificates a Google Cloud project serves from its
 // load balancers: the Compute Engine SSL certificates, global and regional,
-// and the target HTTPS and SSL proxies that use them. It calls the Compute
-// REST API directly with three list methods, so the IAM permissions it
-// needs are compute.sslCertificates.list, compute.targetHttpsProxies.list
-// and compute.targetSslProxies.list.
+// with the target HTTPS and SSL proxies that use them, and the certificates
+// in Certificate Manager, with the resources that use them. It calls the
+// REST APIs directly with list methods only, so the IAM permissions it
+// needs are compute.sslCertificates.list, compute.targetHttpsProxies.list,
+// compute.targetSslProxies.list, certificatemanager.locations.list and
+// certificatemanager.certs.list.
 package gcp
 
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/oauth2/google"
 )
 
-// DefaultEndpoint is the Compute Engine REST API.
-const DefaultEndpoint = "https://compute.googleapis.com/compute/v1/"
+// Default endpoints of the APIs List reads.
+const (
+	DefaultComputeEndpoint            = "https://compute.googleapis.com/compute/v1/"
+	DefaultCertificateManagerEndpoint = "https://certificatemanager.googleapis.com/v1/"
+)
 
-const readOnlyScope = "https://www.googleapis.com/auth/compute.readonly"
+// Sources of a Certificate. They are part of the public JSON contract.
+const (
+	SourceCompute            = "compute"
+	SourceCertificateManager = "certificate_manager"
+)
+
+// cloudPlatformScope is the only OAuth scope Certificate Manager accepts.
+// It does not widen what the credentials can do: IAM decides that, and List
+// calls list methods alone.
+const cloudPlatformScope = "https://www.googleapis.com/auth/cloud-platform"
 
 // maxBody bounds how much of one API response List reads.
 const maxBody = 32 << 20
 
-// Certificate is one SSL certificate of the project. Managed is true for a
-// certificate Google issues and renews; a self-managed one was uploaded and
-// is never renewed. NotAfter is nil for a managed certificate that was not
-// issued yet.
+// locationConcurrency bounds the Certificate Manager calls made at once, one
+// per location.
+const locationConcurrency = 8
+
+// Certificate is one certificate of the project. Source is SourceCompute or
+// SourceCertificateManager. Managed is true for a certificate Google issues
+// and renews; a self-managed one was uploaded and is never renewed. NotAfter
+// is nil for a managed certificate that was not issued yet. InUseBy holds
+// resource paths starting at "projects/".
 type Certificate struct {
 	Name     string
 	Domain   string
 	Location string
+	Source   string
 	Managed  bool
 	NotAfter *time.Time
 	InUseBy  []string
 }
 
-// Service calls the Compute REST API at Endpoint with Client, which signs
-// requests.
+// Service calls the Google Cloud REST APIs with Client, which signs
+// requests, at the endpoints it names.
 type Service struct {
-	Client   *http.Client
-	Endpoint string
+	Client                     *http.Client
+	ComputeEndpoint            string
+	CertificateManagerEndpoint string
 }
 
 // NewService builds a Service that signs in with Application Default
-// Credentials, read-only.
+// Credentials.
 func NewService(ctx context.Context) (*Service, error) {
-	client, err := google.DefaultClient(ctx, readOnlyScope)
+	client, err := google.DefaultClient(ctx, cloudPlatformScope)
 	if err != nil {
 		return nil, fmt.Errorf("find Google Cloud credentials: %w", err)
 	}
-	return &Service{Client: client, Endpoint: DefaultEndpoint}, nil
+	return &Service{Client: client, ComputeEndpoint: DefaultComputeEndpoint, CertificateManagerEndpoint: DefaultCertificateManagerEndpoint}, nil
 }
 
-// APIError is an error response of the Compute API. Reason is the first
+// APIError is an error response of a Google Cloud API. Reason is the first
 // ErrorInfo reason Google gives, such as SERVICE_DISABLED or
 // BILLING_DISABLED, and is empty when it gives none.
 type APIError struct {
@@ -66,15 +89,34 @@ type APIError struct {
 	Message string
 }
 
-// Disabled reports whether the project cannot use Compute Engine at all,
-// because its API or its billing is disabled; such a project has no SSL
-// certificates to list.
+func (e *APIError) Error() string {
+	return fmt.Sprintf("Google Cloud answered %d: %s", e.Code, e.Message)
+}
+
+// Disabled reports whether the project cannot use the API at all, because
+// the API or the project's billing is disabled.
 func (e *APIError) Disabled() bool {
 	return e.Reason == "SERVICE_DISABLED" || e.Reason == "BILLING_DISABLED"
 }
 
-func (e *APIError) Error() string {
-	return fmt.Sprintf("Google Cloud answered %d: %s", e.Code, e.Message)
+// List returns every certificate of project: the Compute SSL certificates,
+// then the Certificate Manager ones. A project with Certificate Manager
+// disabled has none there, which is not an error; a project with Compute
+// disabled is, since it serves no load balancer at all.
+func List(ctx context.Context, svc *Service, project string) ([]Certificate, error) {
+	certs, err := computeCertificates(ctx, svc, project)
+	if err != nil {
+		return nil, err
+	}
+	managed, err := managerCertificates(ctx, svc, project)
+	var apiErr *APIError
+	if errors.As(err, &apiErr) && apiErr.Reason == "SERVICE_DISABLED" {
+		return certs, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return append(certs, managed...), nil
 }
 
 type sslCertificate struct {
@@ -93,23 +135,31 @@ type proxy struct {
 	SslCertificates []string `json:"sslCertificates"`
 }
 
-// List returns every SSL certificate of project, global and regional, each
-// with the target proxies that serve it.
-func List(ctx context.Context, svc *Service, project string) ([]Certificate, error) {
+func computeCertificates(ctx context.Context, svc *Service, project string) ([]Certificate, error) {
 	users, err := proxyUsers(ctx, svc, project)
 	if err != nil {
 		return nil, err
 	}
 	var certs []Certificate
-	err = list(ctx, svc, project, "aggregated/sslCertificates", func(scopes map[string]struct {
-		SslCertificates []sslCertificate `json:"sslCertificates"`
+	err = list(ctx, svc.Client, computeURL(svc, project, "aggregated/sslCertificates"), func(p struct {
+		paged
+		Items map[string]struct {
+			SslCertificates []sslCertificate `json:"sslCertificates"`
+		} `json:"items"`
 	}) error {
-		for scope, list := range scopes {
-			for _, c := range list.SslCertificates {
-				cert, err := fromCompute(c, scope)
+		for scope, l := range p.Items {
+			for _, c := range l.SslCertificates {
+				domains := c.SANs
+				if len(domains) == 0 && c.Managed != nil {
+					domains = c.Managed.Domains
+				}
+				cert, err := certificate(c.Name, domains, c.Expire)
 				if err != nil {
 					return err
 				}
+				cert.Location = strings.TrimPrefix(scope, "regions/")
+				cert.Source = SourceCompute
+				cert.Managed = c.Type == "MANAGED"
 				cert.InUseBy = users[resourcePath(c.SelfLink)]
 				certs = append(certs, cert)
 			}
@@ -122,31 +172,8 @@ func List(ctx context.Context, svc *Service, project string) ([]Certificate, err
 	return certs, nil
 }
 
-func fromCompute(c sslCertificate, scope string) (Certificate, error) {
-	cert := Certificate{
-		Name:     c.Name,
-		Domain:   c.Name,
-		Location: strings.TrimPrefix(scope, "regions/"),
-		Managed:  c.Type == "MANAGED",
-	}
-	switch {
-	case len(c.SANs) > 0:
-		cert.Domain = c.SANs[0]
-	case c.Managed != nil && len(c.Managed.Domains) > 0:
-		cert.Domain = c.Managed.Domains[0]
-	}
-	if c.Expire != "" {
-		at, err := time.Parse(time.RFC3339, c.Expire)
-		if err != nil {
-			return Certificate{}, fmt.Errorf("SSL certificate %s has expireTime %q: %w", c.Name, c.Expire, err)
-		}
-		cert.NotAfter = &at
-	}
-	return cert, nil
-}
-
-// proxyUsers maps each SSL certificate, by resource path, to the target
-// HTTPS and SSL proxies that list it.
+// proxyUsers maps each Compute SSL certificate, by resource path, to the
+// target HTTPS and SSL proxies that list it.
 func proxyUsers(ctx context.Context, svc *Service, project string) (map[string][]string, error) {
 	users := map[string][]string{}
 	add := func(proxies []proxy) {
@@ -156,10 +183,13 @@ func proxyUsers(ctx context.Context, svc *Service, project string) (map[string][
 			}
 		}
 	}
-	err := list(ctx, svc, project, "aggregated/targetHttpsProxies", func(scopes map[string]struct {
-		TargetHTTPSProxies []proxy `json:"targetHttpsProxies"`
+	err := list(ctx, svc.Client, computeURL(svc, project, "aggregated/targetHttpsProxies"), func(p struct {
+		paged
+		Items map[string]struct {
+			TargetHTTPSProxies []proxy `json:"targetHttpsProxies"`
+		} `json:"items"`
 	}) error {
-		for _, l := range scopes {
+		for _, l := range p.Items {
 			add(l.TargetHTTPSProxies)
 		}
 		return nil
@@ -167,8 +197,11 @@ func proxyUsers(ctx context.Context, svc *Service, project string) (map[string][
 	if err != nil {
 		return nil, fmt.Errorf("list target HTTPS proxies: %w", err)
 	}
-	err = list(ctx, svc, project, "global/targetSslProxies", func(proxies []proxy) error {
-		add(proxies)
+	err = list(ctx, svc.Client, computeURL(svc, project, "global/targetSslProxies"), func(p struct {
+		paged
+		Items []proxy `json:"items"`
+	}) error {
+		add(p.Items)
 		return nil
 	})
 	if err != nil {
@@ -177,37 +210,159 @@ func proxyUsers(ctx context.Context, svc *Service, project string) (map[string][
 	return users, nil
 }
 
-// page is one response of a Compute list method: Items is a list for a
-// global method and a map from scope to list for an aggregated one.
-type page[T any] struct {
-	Items         T      `json:"items"`
+type managerCertificate struct {
+	Name    string   `json:"name"`
+	SANs    []string `json:"sanDnsnames"`
+	Expire  string   `json:"expireTime"`
+	Managed *struct {
+		Domains []string `json:"domains"`
+	} `json:"managed"`
+	UsedBy []struct {
+		Name string `json:"name"`
+	} `json:"usedBy"`
+}
+
+// managerCertificates lists the project's Certificate Manager locations,
+// then the certificates of each, locationConcurrency locations at a time.
+// The first failure stops the calls not yet made and is the error returned.
+func managerCertificates(ctx context.Context, svc *Service, project string) ([]Certificate, error) {
+	var locations []string
+	err := list(ctx, svc.Client, managerURL(svc, "projects/"+url.PathEscape(project)+"/locations"), func(p struct {
+		paged
+		Locations []struct {
+			LocationID string `json:"locationId"`
+		} `json:"locations"`
+	}) error {
+		for _, l := range p.Locations {
+			locations = append(locations, l.LocationID)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list Certificate Manager locations: %w", err)
+	}
+
+	ctx, cancel := context.WithCancelCause(ctx)
+	defer cancel(nil)
+	byLocation := make([][]Certificate, len(locations))
+	sem := make(chan struct{}, locationConcurrency)
+	var wg sync.WaitGroup
+admit:
+	for i, loc := range locations {
+		if ctx.Err() != nil {
+			break
+		}
+		select {
+		case sem <- struct{}{}:
+		case <-ctx.Done():
+			break admit
+		}
+		wg.Go(func() {
+			defer func() { <-sem }()
+			certs, err := managerLocation(ctx, svc, project, loc)
+			if err != nil {
+				cancel(fmt.Errorf("list Certificate Manager certificates in %s: %w", loc, err))
+				return
+			}
+			byLocation[i] = certs
+		})
+	}
+	wg.Wait()
+	if ctx.Err() != nil {
+		return nil, context.Cause(ctx)
+	}
+	var certs []Certificate
+	for _, l := range byLocation {
+		certs = append(certs, l...)
+	}
+	return certs, nil
+}
+
+func managerLocation(ctx context.Context, svc *Service, project, location string) ([]Certificate, error) {
+	var certs []Certificate
+	u := managerURL(svc, "projects/"+url.PathEscape(project)+"/locations/"+url.PathEscape(location)+"/certificates")
+	err := list(ctx, svc.Client, u, func(p struct {
+		paged
+		Certificates []managerCertificate `json:"certificates"`
+	}) error {
+		for _, c := range p.Certificates {
+			domains := c.SANs
+			if len(domains) == 0 && c.Managed != nil {
+				domains = c.Managed.Domains
+			}
+			cert, err := certificate(c.Name[strings.LastIndex(c.Name, "/")+1:], domains, c.Expire)
+			if err != nil {
+				return err
+			}
+			cert.Location = location
+			cert.Source = SourceCertificateManager
+			cert.Managed = c.Managed != nil
+			for _, user := range c.UsedBy {
+				cert.InUseBy = append(cert.InUseBy, resourcePath(user.Name))
+			}
+			certs = append(certs, cert)
+		}
+		return nil
+	})
+	return certs, err
+}
+
+// certificate builds the fields both APIs share: the domain is the first
+// name the certificate covers, or its own name when it lists none, and an
+// empty expireTime leaves NotAfter nil.
+func certificate(name string, domains []string, expire string) (Certificate, error) {
+	cert := Certificate{Name: name, Domain: name}
+	if len(domains) > 0 {
+		cert.Domain = domains[0]
+	}
+	if expire != "" {
+		at, err := time.Parse(time.RFC3339, expire)
+		if err != nil {
+			return Certificate{}, fmt.Errorf("certificate %s has expireTime %q: %w", name, expire, err)
+		}
+		cert.NotAfter = &at
+	}
+	return cert, nil
+}
+
+func computeURL(svc *Service, project, path string) string {
+	return strings.TrimSuffix(svc.ComputeEndpoint, "/") + "/projects/" + url.PathEscape(project) + "/" + path
+}
+
+func managerURL(svc *Service, path string) string {
+	return strings.TrimSuffix(svc.CertificateManagerEndpoint, "/") + "/" + path
+}
+
+// paged is embedded in every page type list decodes; the token names the
+// next page and is empty on the last one.
+type paged struct {
 	NextPageToken string `json:"nextPageToken"`
 }
 
-// list calls the list method at path for project, once per page, and hands
-// each page's items to each.
-func list[T any](ctx context.Context, svc *Service, project, path string, each func(T) error) error {
-	base := strings.TrimSuffix(svc.Endpoint, "/") + "/projects/" + url.PathEscape(project) + "/" + path
+func (p paged) next() string { return p.NextPageToken }
+
+// list calls the list method at u, once per page, and hands each decoded
+// page to each.
+func list[P interface{ next() string }](ctx context.Context, client *http.Client, u string, each func(P) error) error {
 	for token := ""; ; {
-		u := base
+		pageURL := u
 		if token != "" {
-			u += "?pageToken=" + url.QueryEscape(token)
+			pageURL += "?pageToken=" + url.QueryEscape(token)
 		}
-		body, err := get(ctx, svc.Client, u)
+		body, err := get(ctx, client, pageURL)
 		if err != nil {
 			return err
 		}
-		var p page[T]
+		var p P
 		if err := json.Unmarshal(body, &p); err != nil {
-			return fmt.Errorf("read %s: %w", path, err)
+			return fmt.Errorf("read %s: %w", u, err)
 		}
-		if err := each(p.Items); err != nil {
-			return fmt.Errorf("read %s: %w", path, err)
+		if err := each(p); err != nil {
+			return err
 		}
-		if p.NextPageToken == "" {
+		if token = p.next(); token == "" {
 			return nil
 		}
-		token = p.NextPageToken
 	}
 }
 
@@ -250,9 +405,10 @@ func get(ctx context.Context, client *http.Client, u string) ([]byte, error) {
 	return body, nil
 }
 
-// resourcePath returns a Compute resource URL from "projects/" on, so a
-// reference and a self link name the same resource whatever their host or
-// API version.
+// resourcePath returns a resource name from "projects/" on, so a reference,
+// a self link and a full resource name such as
+// //compute.googleapis.com/projects/p/global/targetHttpsProxies/x name the
+// same resource whatever their host or API version.
 func resourcePath(u string) string {
 	if i := strings.Index(u, "projects/"); i >= 0 {
 		return u[i:]

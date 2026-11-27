@@ -14,7 +14,7 @@ import (
 
 const defaultGCPTimeout = 30 * time.Second
 
-const gcpUsage = `expirely gcp lists the SSL certificates of a Google Cloud project and when they expire.
+const gcpUsage = `expirely gcp lists the certificates of a Google Cloud project and when they expire.
 
 Usage
   expirely gcp [flags]
@@ -34,11 +34,12 @@ Output
       --json              print JSON; the default when stdout is not a terminal
   -h, --help              show this help
 
-expirely gcp signs in with Application Default Credentials, only lists SSL
-certificates and target proxies, and changes nothing.
+expirely gcp signs in with Application Default Credentials, lists the Compute
+SSL certificates with their target proxies and the Certificate Manager
+certificates in every location, and changes nothing.
 `
 
-// runGCP lists the SSL certificates of one Google Cloud project and reports
+// runGCP lists the certificates of one Google Cloud project and reports
 // them the way a scan reports targets.
 func runGCP(ctx context.Context, args []string, s Streams) int {
 	c := newCommand(s, args, gcpUsage)
@@ -84,7 +85,7 @@ func runGCP(ctx context.Context, args []string, s Streams) int {
 	return c.report(newReport(now, w.warnDays, gcpFindings(certs, now, w.warn()), false), time.Since(start))
 }
 
-// gcpFindings turns a project's SSL certificates into findings. A managed
+// gcpFindings turns a project's certificates into findings. A managed
 // certificate that was not issued yet has no end date and is left out.
 func gcpFindings(certs []gcp.Certificate, now time.Time, warn time.Duration) []scan.Finding {
 	findings := make([]scan.Finding, 0, len(certs))
@@ -93,7 +94,7 @@ func gcpFindings(certs []gcp.Certificate, now time.Time, warn time.Duration) []s
 			continue
 		}
 		f := scan.Expiry(cert.Domain, *cert.NotAfter, now, warn)
-		f.GCP = &scan.GCPInfo{Name: cert.Name, Location: cert.Location, Managed: cert.Managed, InUseBy: orEmpty(cert.InUseBy)}
+		f.GCP = &scan.GCPInfo{Name: cert.Name, Location: cert.Location, Source: cert.Source, Managed: cert.Managed, InUseBy: orEmpty(cert.InUseBy)}
 		findings = append(findings, f)
 	}
 	return findings

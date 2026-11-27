@@ -1,5 +1,6 @@
-// Package gcptest serves fake Compute Engine API responses for tests, so
-// code that lists SSL certificates and proxies runs without Google Cloud.
+// Package gcptest serves fake Compute Engine and Certificate Manager API
+// responses for tests, so code that lists certificates runs without Google
+// Cloud.
 package gcptest
 
 import (
@@ -10,50 +11,86 @@ import (
 	"testing"
 )
 
-// Fake holds the JSON bodies the fake Compute API returns, keyed by the
-// path after the project, such as "aggregated/sslCertificates". A path
-// with no body answers 404. Status, when set, answers every request with
-// that status code and a Google API error body instead, with Reason as its
-// ErrorInfo reason when Reason is set.
+// Fake holds the responses of the fake APIs, keyed by the path after the
+// project, such as "aggregated/sslCertificates" for Compute or
+// "locations/global/certificates" for Certificate Manager. A value is
+// encoded as the JSON body, except an Error, which answers with its status,
+// and nil, which answers an empty object. A path with no key answers 404.
+// Status, when set, answers every request as Error{Status, Reason} would.
 type Fake struct {
 	Bodies map[string]any
 	Status int
 	Reason string
 }
 
-// Serve starts the fake API for project and returns the endpoint to pass
-// as gcp.Service.Endpoint. The server stops when the test ends.
-func Serve(t testing.TB, project string, f Fake) string {
+// Error is a Google API error response: Status, with Reason as its
+// ErrorInfo reason when Reason is set.
+type Error struct {
+	Status int
+	Reason string
+}
+
+// Endpoints are the base URLs of the fake APIs, for gcp.Service.
+type Endpoints struct {
+	Compute            string
+	CertificateManager string
+}
+
+// Serve starts the fake APIs for project. The server stops when the test
+// ends.
+func Serve(t testing.TB, project string, f Fake) Endpoints {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		if f.Status != 0 {
-			details := []any{}
-			if f.Reason != "" {
-				details = append(details, map[string]any{"@type": "type.googleapis.com/google.rpc.ErrorInfo", "reason": f.Reason, "domain": "googleapis.com"})
+			writeError(w, Error{Status: f.Status, Reason: f.Reason})
+			return
+		}
+		var body any
+		found := false
+		for _, prefix := range []string{"/compute/v1/projects/" + project + "/", "/certificatemanager/v1/projects/" + project + "/"} {
+			if rest, ok := strings.CutPrefix(r.URL.Path, prefix); ok {
+				body, found = f.Bodies[rest]
 			}
-			w.WriteHeader(f.Status)
-			_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]any{"code": f.Status, "message": "refused by the fake", "details": details}})
-			return
 		}
-		prefix := "/compute/v1/projects/" + project + "/"
-		body, ok := f.Bodies[strings.TrimPrefix(r.URL.Path, prefix)]
-		if !strings.HasPrefix(r.URL.Path, prefix) || !ok {
-			http.NotFound(w, r)
-			return
+		switch b := body.(type) {
+		case Error:
+			writeError(w, b)
+		case nil:
+			if !found {
+				http.NotFound(w, r)
+				return
+			}
+			_, _ = w.Write([]byte("{}"))
+		default:
+			_ = json.NewEncoder(w).Encode(b)
 		}
-		_ = json.NewEncoder(w).Encode(body)
 	}))
 	t.Cleanup(srv.Close)
-	return srv.URL + "/compute/v1/"
+	return Endpoints{Compute: srv.URL + "/compute/v1/", CertificateManager: srv.URL + "/certificatemanager/v1/"}
 }
 
-// Sample returns bodies for a project with a self-managed global
-// certificate used by two proxies, a managed one used by none, and a
-// self-managed regional one used by a regional proxy.
+func writeError(w http.ResponseWriter, e Error) {
+	details := []any{}
+	if e.Reason != "" {
+		details = append(details, map[string]any{"@type": "type.googleapis.com/google.rpc.ErrorInfo", "reason": e.Reason, "domain": "googleapis.com"})
+	}
+	w.WriteHeader(e.Status)
+	_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]any{"code": e.Status, "message": "refused by the fake", "details": details}})
+}
+
+// Sample returns responses for a project with, in Compute, a self-managed
+// global certificate used by two proxies, a managed one used by none, one
+// still provisioning and a self-managed regional one used by a regional
+// proxy; and in Certificate Manager, a managed global certificate used by a
+// map entry, a self-managed regional one nothing uses and a location with
+// none.
 func Sample(project string) map[string]any {
 	link := func(scope, kind, name string) string {
 		return "https://compute.googleapis.com/compute/v1/projects/" + project + "/" + scope + "/" + kind + "/" + name
+	}
+	location := func(id string) map[string]any {
+		return map[string]any{"locationId": id, "name": "projects/" + project + "/locations/" + id}
 	}
 	return map[string]any{
 		"aggregated/sslCertificates": map[string]any{
@@ -84,5 +121,26 @@ func Sample(project string) map[string]any {
 				map[string]any{"name": "api-ssl", "selfLink": link("global", "targetSslProxies", "api-ssl"), "sslCertificates": []string{link("global", "sslCertificates", "api-cert")}},
 			},
 		},
+		"locations": map[string]any{
+			"locations": []any{location("global"), location("us-east1"), location("europe-west4")},
+		},
+		"locations/global/certificates": map[string]any{
+			"certificates": []any{map[string]any{
+				"name":        "projects/" + project + "/locations/global/certificates/shop-cm",
+				"sanDnsnames": []string{"shop.example.com"},
+				"expireTime":  "2027-02-01T00:00:00Z",
+				"managed":     map[string]any{"domains": []string{"shop.example.com"}, "state": "ACTIVE"},
+				"usedBy":      []any{map[string]any{"name": "//certificatemanager.googleapis.com/projects/" + project + "/locations/global/certificateMaps/main/certificateMapEntries/shop"}},
+			}},
+		},
+		"locations/us-east1/certificates": map[string]any{
+			"certificates": []any{map[string]any{
+				"name":        "projects/" + project + "/locations/us-east1/certificates/legacy-cm",
+				"sanDnsnames": []string{"legacy.example.com"},
+				"expireTime":  "2026-12-01T00:00:00Z",
+				"selfManaged": map[string]any{},
+			}},
+		},
+		"locations/europe-west4/certificates": nil,
 	}
 }

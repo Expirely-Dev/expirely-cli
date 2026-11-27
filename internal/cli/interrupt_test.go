@@ -37,7 +37,7 @@ func TestRunStopsWhenInterrupted(t *testing.T) {
 					return sampleACM(), "us-east-1", nil
 				},
 				NewGCP: func(context.Context) (*gcp.Service, error) {
-					return &gcp.Service{Client: http.DefaultClient, Endpoint: endpoint}, nil
+					return &gcp.Service{Client: http.DefaultClient, ComputeEndpoint: endpoint.Compute, CertificateManagerEndpoint: endpoint.CertificateManager}, nil
 				},
 			})
 
