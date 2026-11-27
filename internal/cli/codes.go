@@ -32,7 +32,7 @@ var remediations = map[string]string{
 	CodeFileUnreadable:     "A --file needs to exist, be readable and hold one target per line of at most 64 KiB; - reads stdin.",
 	CodeInvalidCAFile:      "A --ca-file is a readable PEM file with one or more CERTIFICATE blocks, such as an internal CA's root.",
 	CodeAWSNotConfigured:   "expirely aws reads the profile from --profile or AWS_PROFILE and the region from --region, AWS_REGION or that profile, as the AWS CLI does.",
-	CodeAWSAccessDenied:    "The credentials were refused, expired or lack acm:ListCertificates and acm:DescribeCertificate in this account and region, or account:ListRegions for --region all.",
+	CodeAWSAccessDenied:    "The credentials were refused, expired or lack acm:ListCertificates and acm:DescribeCertificate in this account and region, or ec2:DescribeRegions for --region all.",
 	CodeAWSRequestFailed:   "ACM did not answer as expected; the message has its reason, and a later run or a longer --timeout often succeeds.",
 	CodeGCPNotConfigured:   "expirely gcp reads the project from --project, GOOGLE_CLOUD_PROJECT or CLOUDSDK_CORE_PROJECT and signs in with Application Default Credentials, as gcloud auth application-default login sets up.",
 	CodeGCPAccessDenied:    "The credentials were refused or lack compute.sslCertificates.list, compute.targetHttpsProxies.list, compute.targetSslProxies.list, certificatemanager.locations.list or certificatemanager.certs.list in this project.",

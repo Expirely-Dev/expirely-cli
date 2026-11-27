@@ -48,7 +48,7 @@ Output
   -h, --help              show this help
 
 expirely aws only calls acm:ListCertificates and acm:DescribeCertificate, plus
-account:ListRegions for --region all, and changes nothing. A region it cannot
+ec2:DescribeRegions for --region all, and changes nothing. A region it cannot
 read is listed in unreadable, and the run exits 3 unless a certificate it read
 exits 1.
 `
@@ -127,7 +127,7 @@ func runAWS(ctx context.Context, args []string, s Streams) int {
 			return c.fail(awsError(err))
 		}
 		if len(regions) == 0 {
-			return c.fail(failf(CodeAWSRequestFailed, "account:ListRegions returned no enabled region"))
+			return c.fail(failf(CodeAWSRequestFailed, "ec2:DescribeRegions returned no enabled region"))
 		}
 	}
 

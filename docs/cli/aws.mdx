@@ -45,7 +45,7 @@ A certificate that was never issued, such as one pending validation, has no end 
 
 ## Permissions
 
-`expirely aws` calls `acm:ListCertificates` and `acm:DescribeCertificate`, and with `--region all` also `account:ListRegions` to find the regions enabled in the account. This policy is enough for every form:
+`expirely aws` calls `acm:ListCertificates` and `acm:DescribeCertificate`, and with `--region all` also `ec2:DescribeRegions` to find the regions enabled in the account. The AWS managed policy `ReadOnlyAccess` grants all three, through `acm:Describe*`, `acm:List*` and `ec2:Describe*`. This policy is enough for every form:
 
 ```json
 {
@@ -53,7 +53,7 @@ A certificate that was never issued, such as one pending validation, has no end 
   "Statement": [
     {
       "Effect": "Allow",
-      "Action": ["acm:ListCertificates", "acm:DescribeCertificate", "account:ListRegions"],
+      "Action": ["acm:ListCertificates", "acm:DescribeCertificate", "ec2:DescribeRegions"],
       "Resource": "*"
     }
   ]

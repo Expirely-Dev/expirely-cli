@@ -6,8 +6,8 @@ require (
 	charm.land/lipgloss/v2 v2.1.1
 	github.com/aws/aws-sdk-go-v2 v1.48.1
 	github.com/aws/aws-sdk-go-v2/config v1.33.22
-	github.com/aws/aws-sdk-go-v2/service/account v1.42.12
 	github.com/aws/aws-sdk-go-v2/service/acm v1.52.1
+	github.com/aws/aws-sdk-go-v2/service/ec2 v1.350.1
 	github.com/aws/smithy-go v1.28.10
 	github.com/charmbracelet/colorprofile v0.4.3
 	github.com/charmbracelet/x/ansi v0.12.0

@@ -3,51 +3,42 @@ package acm
 import (
 	"context"
 	"errors"
-	"slices"
 	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/account"
-	accounttypes "github.com/aws/aws-sdk-go-v2/service/account/types"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 )
 
 type fakeRegions struct {
-	pages [][]string
-	asked []accounttypes.RegionOptStatus
+	names []string
+	asked *ec2.DescribeRegionsInput
 	err   error
 }
 
-func (f *fakeRegions) ListRegions(_ context.Context, in *account.ListRegionsInput, _ ...func(*account.Options)) (*account.ListRegionsOutput, error) {
+func (f *fakeRegions) DescribeRegions(_ context.Context, in *ec2.DescribeRegionsInput, _ ...func(*ec2.Options)) (*ec2.DescribeRegionsOutput, error) {
+	f.asked = in
 	if f.err != nil {
 		return nil, f.err
 	}
-	f.asked = in.RegionOptStatusContains
-	page := 0
-	if in.NextToken != nil {
-		page = 1
-	}
-	out := &account.ListRegionsOutput{}
-	for _, name := range f.pages[page] {
-		out.Regions = append(out.Regions, accounttypes.Region{RegionName: aws.String(name)})
-	}
-	if page+1 < len(f.pages) {
-		out.NextToken = aws.String("next")
+	out := &ec2.DescribeRegionsOutput{}
+	for _, name := range f.names {
+		out.Regions = append(out.Regions, ec2types.Region{RegionName: aws.String(name)})
 	}
 	return out, nil
 }
 
-func TestEnabledRegionsReadsEveryPageSorted(t *testing.T) {
-	api := &fakeRegions{pages: [][]string{{"us-east-1", "ap-south-1"}, {"eu-west-1"}}}
+func TestEnabledRegionsSortsWhatTheAccountCanUse(t *testing.T) {
+	api := &fakeRegions{names: []string{"us-east-1", "ap-south-1", "eu-west-1"}}
 
 	got, err := EnabledRegions(context.Background(), api)
 
 	if err != nil || strings.Join(got, ",") != "ap-south-1,eu-west-1,us-east-1" {
-		t.Errorf("EnabledRegions() = %v, %v; want every page, sorted", got, err)
+		t.Errorf("EnabledRegions() = %v, %v; want the regions sorted", got, err)
 	}
-	want := []accounttypes.RegionOptStatus{accounttypes.RegionOptStatusEnabled, accounttypes.RegionOptStatusEnabledByDefault}
-	if !slices.Equal(api.asked, want) {
-		t.Errorf("asked for regions %v, want only %v", api.asked, want)
+	if api.asked.AllRegions != nil {
+		t.Errorf("AllRegions = %v, want unset so regions the account has not opted in to stay out", *api.asked.AllRegions)
 	}
 }
 

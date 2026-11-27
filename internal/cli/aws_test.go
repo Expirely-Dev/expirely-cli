@@ -342,7 +342,7 @@ func TestAWSRegionList(t *testing.T) {
 }
 
 func TestAWSRegionErrors(t *testing.T) {
-	denied := &smithy.GenericAPIError{Code: "AccessDeniedException", Message: "not authorized to perform account:ListRegions"}
+	denied := &smithy.GenericAPIError{Code: "AccessDeniedException", Message: "not authorized to perform ec2:DescribeRegions"}
 	tests := []struct {
 		name     string
 		acct     fakeAccount

@@ -1,12 +1,12 @@
 // Package acm reads the certificates AWS Certificate Manager holds in the
 // regions of one account. It only calls ListCertificates and
-// DescribeCertificate, plus ListRegions of the Account Management API to
-// find the enabled regions, so the IAM permissions it needs are
-// acm:ListCertificates, acm:DescribeCertificate and, for every region,
-// account:ListRegions.
+// DescribeCertificate, plus EC2 DescribeRegions to find the enabled
+// regions, so the IAM permissions it needs are acm:ListCertificates,
+// acm:DescribeCertificate and, for every region, ec2:DescribeRegions.
 package acm
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"slices"
@@ -15,10 +15,9 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/account"
-	accounttypes "github.com/aws/aws-sdk-go-v2/service/account/types"
 	sdk "github.com/aws/aws-sdk-go-v2/service/acm"
 	"github.com/aws/aws-sdk-go-v2/service/acm/types"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
 )
 
 // API is the part of the ACM client List calls.
@@ -123,10 +122,9 @@ type Account interface {
 	EnabledRegions(ctx context.Context) ([]string, error)
 }
 
-// RegionsAPI is the part of the Account Management client EnabledRegions
-// calls.
+// RegionsAPI is the part of the EC2 client EnabledRegions calls.
 type RegionsAPI interface {
-	ListRegions(ctx context.Context, in *account.ListRegionsInput, opts ...func(*account.Options)) (*account.ListRegionsOutput, error)
+	DescribeRegions(ctx context.Context, in *ec2.DescribeRegionsInput, opts ...func(*ec2.Options)) (*ec2.DescribeRegionsOutput, error)
 }
 
 // Session is the Account of one AWS configuration.
@@ -161,29 +159,27 @@ func (s *Session) Client(region string) API {
 }
 
 // EnabledRegions lists the account's enabled regions with
-// account:ListRegions, which Account Management answers from us-east-1
-// whatever the configured region.
+// ec2:DescribeRegions, asked in the configured region or, without one, in
+// us-east-1. The AWS managed policy ReadOnlyAccess grants it through
+// ec2:Describe*, and read-only roles that deny account:ListRegions still
+// allow it.
 func (s *Session) EnabledRegions(ctx context.Context) ([]string, error) {
-	return EnabledRegions(ctx, account.NewFromConfig(s.cfg, func(o *account.Options) { o.Region = "us-east-1" }))
+	region := cmp.Or(s.cfg.Region, "us-east-1")
+	return EnabledRegions(ctx, ec2.NewFromConfig(s.cfg, func(o *ec2.Options) { o.Region = region }))
 }
 
-// EnabledRegions lists, sorted, the regions api reports as enabled by
-// default or opted in.
+// EnabledRegions lists, sorted, the regions api reports as enabled for the
+// account: those enabled by default and those opted in. DescribeRegions
+// leaves out regions the account has not opted in to unless asked for all
+// of them, which EnabledRegions does not ask.
 func EnabledRegions(ctx context.Context, api RegionsAPI) ([]string, error) {
-	in := &account.ListRegionsInput{RegionOptStatusContains: []accounttypes.RegionOptStatus{
-		accounttypes.RegionOptStatusEnabled,
-		accounttypes.RegionOptStatusEnabledByDefault,
-	}}
-	var regions []string
-	pages := account.NewListRegionsPaginator(api, in)
-	for pages.HasMorePages() {
-		page, err := pages.NextPage(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("list the enabled AWS regions: %w", err)
-		}
-		for _, r := range page.Regions {
-			regions = append(regions, aws.ToString(r.RegionName))
-		}
+	out, err := api.DescribeRegions(ctx, &ec2.DescribeRegionsInput{})
+	if err != nil {
+		return nil, fmt.Errorf("list the enabled AWS regions: %w", err)
+	}
+	regions := make([]string, 0, len(out.Regions))
+	for _, r := range out.Regions {
+		regions = append(regions, aws.ToString(r.RegionName))
 	}
 	slices.Sort(regions)
 	return regions, nil
