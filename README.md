@@ -1,3 +1,5 @@
+<img src="docs/favicon.svg" alt="" width="64" height="64">
+
 # expirely
 
 Know which certificate expires next, before your users do.
