@@ -2,6 +2,15 @@
 
 Every release of expirely, newest first. From v0.4.0 on, release-please writes this file from the commit titles. Until 1.0, a release can change flags, JSON fields and codes; such a change is listed as breaking, with what to do.
 
+## [0.6.0](https://github.com/bycavii/expirely-cli/compare/v0.5.0...v0.6.0) (2026-11-27)
+
+
+### Added
+
+* add --status, --fields and --limit to every command ([fdc89c7](https://github.com/bycavii/expirely-cli/commit/fdc89c7705bee8bc6a0031e59bd3c04a0ee2bc7f))
+* **gcp:** report the regions google cannot reach instead of failing ([fc0b500](https://github.com/bycavii/expirely-cli/commit/fc0b500180403ae4e9b752a5c9899bf0805c669c))
+* show a spinner while expirely aws and gcp read the cloud ([4714cad](https://github.com/bycavii/expirely-cli/commit/4714cad51e3dbef7f7a93d9d3209be715c4bc64e))
+
 ## [0.5.0](https://github.com/bycavii/expirely-cli/compare/v0.4.0...v0.5.0) (2026-11-27)
 
 
