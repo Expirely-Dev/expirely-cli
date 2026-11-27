@@ -2,6 +2,13 @@
 
 Every release of expirely, newest first. From v0.4.0 on, release-please writes this file from the commit titles. Until 1.0, a release can change flags, JSON fields and codes; such a change is listed as breaking, with what to do.
 
+## [0.10.1](https://github.com/Expirely-Dev/expirely-cli/compare/v0.10.0...v0.10.1) (2026-11-27)
+
+
+### Fixed
+
+* **ci:** error text edges ([#16](https://github.com/Expirely-Dev/expirely-cli/issues/16)) ([12de3e1](https://github.com/Expirely-Dev/expirely-cli/commit/12de3e16a37691df12a8480d373b790720fbc151))
+
 ## [0.10.0](https://github.com/Expirely-Dev/expirely-cli/compare/v0.9.0...v0.10.0) (2026-11-27)
 
 
