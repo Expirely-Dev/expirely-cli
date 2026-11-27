@@ -74,6 +74,8 @@ The JSON report is the one in [Output](/reference/output). Each result has a `gc
 | `gcp.managed`   | `true` for a certificate Google renews                                                |
 | `gcp.in_use_by` | The resources that use it, as paths from `projects/`; empty when none do              |
 
+While the project is read for longer than 150 ms, stderr shows `Reading the certificates of project PROJECT` and erases that line before the results print. Like the scan spinner, it appears only when stderr is a terminal and no AI agent is detected.
+
 ## Exit codes
 
 The same as a scan: `0` when every certificate is `ok`, `1` when one is `expired` or `expiring`. A missing project or credentials exit `2` with `gcp_not_configured`; refused credentials or missing permissions exit `3` with `gcp_access_denied`; a project with the Compute Engine API or billing disabled exits `3` with `gcp_compute_disabled`, since it serves no load balancer; and any other Google Cloud failure exits `3` with `gcp_request_failed`. Each code is in [Error codes](/reference/error-codes).

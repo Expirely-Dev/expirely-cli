@@ -18,11 +18,12 @@ const (
 	clearLine       = "\r\x1b[2K"
 )
 
-// Spinner shows "Scanning N targets" with a count of finished targets on
-// one line of a terminal, and erases that line when it stops. It draws
-// nothing until spinnerDelay has passed.
+// Spinner shows a label on one line of a terminal, such as "Scanning N
+// targets" with a count of finished targets, and erases that line when it
+// stops. It draws nothing until spinnerDelay has passed.
 type Spinner struct {
 	w     io.Writer
+	label string
 	total int
 	done  atomic.Int64
 	stop  chan struct{}
@@ -34,7 +35,18 @@ type Spinner struct {
 // terminal; a caller that has no terminal does not start one. Stop must be
 // called to end it.
 func StartSpinner(w io.Writer, total int) *Spinner {
-	s := &Spinner{w: w, total: total, stop: make(chan struct{})}
+	return start(&Spinner{w: w, total: total})
+}
+
+// StartWaiting starts a spinner on w that shows label, after Clean, with
+// no count, for work whose size is not known until it ends. Stop must be
+// called to end it.
+func StartWaiting(w io.Writer, label string) *Spinner {
+	return start(&Spinner{w: w, label: Clean(label)})
+}
+
+func start(s *Spinner) *Spinner {
+	s.stop = make(chan struct{})
 	s.wg.Go(s.run)
 	return s
 }
@@ -75,6 +87,9 @@ func (s *Spinner) run() {
 }
 
 func (s *Spinner) line(frame int) string {
+	if s.label != "" {
+		return frames[frame%len(frames)] + " " + s.label
+	}
 	text := frames[frame%len(frames)] + " Scanning " + strconv.Itoa(s.total) + " target"
 	if s.total == 1 {
 		return text

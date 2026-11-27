@@ -77,3 +77,18 @@ func TestSpinnerOneTargetHasNoCount(t *testing.T) {
 		}
 	})
 }
+
+func TestWaitingSpinnerShowsItsLabelClean(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var out lockedBuffer
+		s := StartWaiting(&out, "Reading ACM in us-east-1\x1b[31m")
+		time.Sleep(spinnerDelay)
+		synctest.Wait()
+		s.Done()
+		s.Stop()
+
+		if got := out.String(); !strings.Contains(got, "⠋ Reading ACM in us-east-1[31m"+clearLine) {
+			t.Errorf("output = %q, want the label with no count and no escape character", got)
+		}
+	})
+}

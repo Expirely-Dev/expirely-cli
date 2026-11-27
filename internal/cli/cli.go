@@ -192,7 +192,7 @@ func runScan(ctx context.Context, args []string, s Streams) int {
 	start := time.Now()
 	opts := scan.Options{Warn: w.warn(), Timeout: w.timeout, Now: start, Concurrency: *concurrency}
 	var spinner *ui.Spinner
-	if c.StderrIsTerminal && c.agent.Name == "" {
+	if c.showsProgress() {
 		spinner = ui.StartSpinner(c.Stderr, len(targets))
 		opts.Progress = spinner.Done
 	}

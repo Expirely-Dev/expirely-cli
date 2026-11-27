@@ -91,7 +91,9 @@ func runAWS(ctx context.Context, args []string, s Streams) int {
 
 	start := time.Now()
 	readCtx, cancel := context.WithTimeout(ctx, w.timeout)
+	stop := c.waiting("Reading ACM in " + resolved)
 	certs, err := acm.List(readCtx, client)
+	stop()
 	cancel()
 	if ctx.Err() != nil {
 		return c.interrupted(ctx.Err())

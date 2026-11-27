@@ -82,7 +82,9 @@ func runGCP(ctx context.Context, args []string, s Streams) int {
 
 	start := time.Now()
 	readCtx, cancel := context.WithTimeout(ctx, w.timeout)
+	stop := c.waiting("Reading the certificates of project " + *project)
 	certs, err := gcp.List(readCtx, svc, *project)
+	stop()
 	cancel()
 	if ctx.Err() != nil {
 		return c.interrupted(ctx.Err())

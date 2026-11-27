@@ -112,6 +112,21 @@ func (c *command) fail(e *Error) int {
 	return code
 }
 
+// showsProgress reports whether a spinner may be drawn on stderr: only
+// for a person, at a terminal.
+func (c *command) showsProgress() bool {
+	return c.StderrIsTerminal && c.agent.Name == ""
+}
+
+// waiting draws a spinner labeled label while work of unknown size runs,
+// when showsProgress allows one, and returns the function that erases it.
+func (c *command) waiting(label string) (stop func()) {
+	if !c.showsProgress() {
+		return func() {}
+	}
+	return ui.StartWaiting(c.Stderr, label).Stop
+}
+
 // interrupted reports a command stopped by its context, such as by
 // Ctrl-C, and returns ExitInterrupted.
 func (c *command) interrupted(err error) int {

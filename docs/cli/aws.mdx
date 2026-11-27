@@ -74,6 +74,8 @@ The JSON report is the one in [Output](/reference/output). Each result has an `a
 | `acm.renewal_eligibility` | `ELIGIBLE` or `INELIGIBLE`                                           |
 | `acm.in_use_by`           | ARNs of the resources that use it; empty when none do                |
 
+While ACM is read for longer than 150 ms, stderr shows `Reading ACM in REGION` and erases that line before the results print. Like the scan spinner, it appears only when stderr is a terminal and no AI agent is detected.
+
 ## Exit codes
 
 The same as a scan: `0` when every certificate is `ok`, `1` when one is `expired` or `expiring`. A missing region or profile exits `2` with `aws_not_configured`; refused credentials or missing permissions exit `3` with `aws_access_denied`, and any other AWS failure exits `3` with `aws_request_failed`. Each code is in [Error codes](/reference/error-codes).
