@@ -1,17 +1,22 @@
-// Package acm reads the certificates AWS Certificate Manager holds in one
-// account and region. It only calls ListCertificates and
-// DescribeCertificate, so the IAM permissions it needs are
-// acm:ListCertificates and acm:DescribeCertificate.
+// Package acm reads the certificates AWS Certificate Manager holds in the
+// regions of one account. It only calls ListCertificates and
+// DescribeCertificate, plus ListRegions of the Account Management API to
+// find the enabled regions, so the IAM permissions it needs are
+// acm:ListCertificates, acm:DescribeCertificate and, for every region,
+// account:ListRegions.
 package acm
 
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/account"
+	accounttypes "github.com/aws/aws-sdk-go-v2/service/account/types"
 	sdk "github.com/aws/aws-sdk-go-v2/service/acm"
 	"github.com/aws/aws-sdk-go-v2/service/acm/types"
 )
@@ -108,10 +113,31 @@ admit:
 	return nil
 }
 
-// NewClient builds an ACM client from the AWS configuration: profile and
-// region when given, the environment and shared files otherwise. It returns
-// the region the client uses, which is empty when none is configured.
-func NewClient(ctx context.Context, profile, region string) (*sdk.Client, string, error) {
+// Account reads ACM in the regions of one AWS account, with one set of
+// credentials. Region is the region the configuration names, empty when it
+// names none. EnabledRegions lists the regions the account can use, those
+// enabled by default and those opted in, sorted.
+type Account interface {
+	Region() string
+	Client(region string) API
+	EnabledRegions(ctx context.Context) ([]string, error)
+}
+
+// RegionsAPI is the part of the Account Management client EnabledRegions
+// calls.
+type RegionsAPI interface {
+	ListRegions(ctx context.Context, in *account.ListRegionsInput, opts ...func(*account.Options)) (*account.ListRegionsOutput, error)
+}
+
+// Session is the Account of one AWS configuration.
+type Session struct {
+	cfg aws.Config
+}
+
+// NewSession loads the AWS configuration: profile and region when given,
+// the environment and shared files otherwise. Clients made from it share
+// its credentials, so they are resolved once for every region.
+func NewSession(ctx context.Context, profile, region string) (*Session, error) {
 	var opts []func(*config.LoadOptions) error
 	if profile != "" {
 		opts = append(opts, config.WithSharedConfigProfile(profile))
@@ -121,7 +147,44 @@ func NewClient(ctx context.Context, profile, region string) (*sdk.Client, string
 	}
 	cfg, err := config.LoadDefaultConfig(ctx, opts...)
 	if err != nil {
-		return nil, "", fmt.Errorf("load AWS configuration: %w", err)
+		return nil, fmt.Errorf("load AWS configuration: %w", err)
 	}
-	return sdk.NewFromConfig(cfg), cfg.Region, nil
+	return &Session{cfg: cfg}, nil
+}
+
+// Region returns the region the configuration names, or "".
+func (s *Session) Region() string { return s.cfg.Region }
+
+// Client returns an ACM client for region.
+func (s *Session) Client(region string) API {
+	return sdk.NewFromConfig(s.cfg, func(o *sdk.Options) { o.Region = region })
+}
+
+// EnabledRegions lists the account's enabled regions with
+// account:ListRegions, which Account Management answers from us-east-1
+// whatever the configured region.
+func (s *Session) EnabledRegions(ctx context.Context) ([]string, error) {
+	return EnabledRegions(ctx, account.NewFromConfig(s.cfg, func(o *account.Options) { o.Region = "us-east-1" }))
+}
+
+// EnabledRegions lists, sorted, the regions api reports as enabled by
+// default or opted in.
+func EnabledRegions(ctx context.Context, api RegionsAPI) ([]string, error) {
+	in := &account.ListRegionsInput{RegionOptStatusContains: []accounttypes.RegionOptStatus{
+		accounttypes.RegionOptStatusEnabled,
+		accounttypes.RegionOptStatusEnabledByDefault,
+	}}
+	var regions []string
+	pages := account.NewListRegionsPaginator(api, in)
+	for pages.HasMorePages() {
+		page, err := pages.NextPage(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("list the enabled AWS regions: %w", err)
+		}
+		for _, r := range page.Regions {
+			regions = append(regions, aws.ToString(r.RegionName))
+		}
+	}
+	slices.Sort(regions)
+	return regions, nil
 }

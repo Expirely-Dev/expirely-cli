@@ -1,10 +1,16 @@
 package cli
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"flag"
+	"fmt"
+	"regexp"
 	"slices"
+	"strconv"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/aws/smithy-go"
@@ -21,11 +27,13 @@ Usage
 
 Examples
   expirely aws --profile production --region us-east-1
-  AWS_PROFILE=production expirely aws --warn-days 21
+  expirely aws --profile production --region all
+  AWS_PROFILE=production expirely aws --region us-east-1,eu-west-1 --warn-days 21
 
 AWS
       --profile NAME      profile from the shared AWS config (default AWS_PROFILE or the default chain)
-      --region REGION     region to read (default AWS_REGION or the profile's region)
+      --region REGION     region to read, a comma list, or all for every enabled region
+                          (default AWS_REGION or the profile's region)
 
 Scan
       --warn-days N       flag certificates expiring within N days (default 30)
@@ -39,7 +47,10 @@ Output
       --limit N           show at most N results, most urgent first
   -h, --help              show this help
 
-expirely aws only calls acm:ListCertificates and acm:DescribeCertificate and changes nothing.
+expirely aws only calls acm:ListCertificates and acm:DescribeCertificate, plus
+account:ListRegions for --region all, and changes nothing. A region it cannot
+read is listed in unreadable, and the run exits 3 unless a certificate it read
+exits 1.
 `
 
 // accessDenied are the AWS error codes that mean the credentials were
@@ -75,40 +86,158 @@ func runAWS(ctx context.Context, args []string, s Streams) int {
 		return c.fail(e)
 	}
 
+	regions, explicit, e := regionList(*region)
+	if e != nil {
+		return c.fail(e)
+	}
+
 	newACM := c.NewACM
 	if newACM == nil {
-		newACM = func(ctx context.Context, profile, region string) (acm.API, string, error) {
-			return acm.NewClient(ctx, profile, region)
+		newACM = func(ctx context.Context, profile, region string) (acm.Account, error) {
+			return acm.NewSession(ctx, profile, region)
 		}
 	}
-	client, resolved, err := newACM(ctx, *profile, *region)
+	single := ""
+	if len(regions) == 1 {
+		single = regions[0]
+	}
+	acct, err := newACM(ctx, *profile, single)
 	if err != nil {
 		return c.fail(failf(CodeAWSNotConfigured, "%v", err))
-	}
-	if resolved == "" {
-		return c.fail(failf(CodeAWSNotConfigured, "no AWS region: none in --region, AWS_REGION or the profile"))
 	}
 
 	start := time.Now()
 	readCtx, cancel := context.WithTimeout(ctx, w.timeout)
-	stop := c.waiting("Reading ACM in " + resolved)
-	certs, err := acm.List(readCtx, client)
+	defer cancel()
+	switch {
+	case !explicit:
+		if r := acct.Region(); r != "" {
+			regions = []string{r}
+		} else {
+			return c.fail(failf(CodeAWSNotConfigured, "no AWS region: none in --region, AWS_REGION or the profile"))
+		}
+	case regions == nil:
+		stop := c.waiting("Listing the enabled AWS regions")
+		regions, err = acct.EnabledRegions(readCtx)
+		stop()
+		if ctx.Err() != nil {
+			return c.interrupted(ctx.Err())
+		}
+		if err != nil {
+			return c.fail(awsError(err))
+		}
+		if len(regions) == 0 {
+			return c.fail(failf(CodeAWSRequestFailed, "account:ListRegions returned no enabled region"))
+		}
+	}
+
+	label := "Reading ACM in " + regions[0]
+	if len(regions) > 1 {
+		label = "Reading ACM in " + strconv.Itoa(len(regions)) + " regions"
+	}
+	stop := c.waiting(label)
+	found := readRegions(readCtx, acct, regions)
 	stop()
-	cancel()
 	if ctx.Err() != nil {
 		return c.interrupted(ctx.Err())
 	}
-	if err != nil {
-		return c.fail(awsError(err))
-	}
+
 	now := time.Now()
-	return c.report(newReport(now, w.warnDays, acmFindings(certs, now, w.warn()), v), time.Since(start))
+	var findings []scan.Finding
+	unreadable := []string{}
+	var firstErr error
+	for i, f := range found {
+		if f.err != nil {
+			unreadable = append(unreadable, "acm:"+regions[i])
+			firstErr = cmp.Or(firstErr, f.err)
+			continue
+		}
+		findings = append(findings, acmFindings(f.certs, regions[i], now, w.warn())...)
+	}
+	if len(unreadable) == len(regions) {
+		return c.fail(awsError(firstErr))
+	}
+	r := newReport(now, w.warnDays, findings, v)
+	r.Unreadable = unreadable
+	return c.report(r, time.Since(start))
+}
+
+// regionConcurrency bounds the regions read at once; each region also
+// bounds its own DescribeCertificate calls.
+const regionConcurrency = 8
+
+// regionPattern matches an AWS region name such as us-east-1 or
+// us-gov-west-1.
+var regionPattern = regexp.MustCompile(`^[a-z]{2}(-[a-z]+)+-[0-9]+$`)
+
+// regionList reads --region: empty means the configured region, so
+// explicit is false; "all" means every enabled region, returned as nil;
+// otherwise one region or a comma list, each checked and kept once in the
+// order given.
+func regionList(flagValue string) (regions []string, explicit bool, e *Error) {
+	if flagValue == "" {
+		return nil, false, nil
+	}
+	if flagValue == "all" {
+		return nil, true, nil
+	}
+	for name := range strings.SplitSeq(flagValue, ",") {
+		name = strings.TrimSpace(name)
+		if !regionPattern.MatchString(name) {
+			return nil, true, failf(CodeInvalidFlag, "--region %q is not an AWS region such as us-east-1; pass one, a comma list, or all", name)
+		}
+		if !slices.Contains(regions, name) {
+			regions = append(regions, name)
+		}
+	}
+	return regions, true, nil
+}
+
+type regionRead struct {
+	certs []acm.Certificate
+	err   error
+	done  bool
+}
+
+// readRegions lists the certificates of each region, regionConcurrency
+// regions at a time. A region that fails keeps its error and the others
+// go on; the context bounds them all.
+func readRegions(ctx context.Context, acct acm.Account, regions []string) []regionRead {
+	found := make([]regionRead, len(regions))
+	sem := make(chan struct{}, regionConcurrency)
+	var wg sync.WaitGroup
+admit:
+	for i, region := range regions {
+		if ctx.Err() != nil {
+			break
+		}
+		select {
+		case sem <- struct{}{}:
+		case <-ctx.Done():
+			break admit
+		}
+		wg.Go(func() {
+			defer func() { <-sem }()
+			certs, err := acm.List(ctx, acct.Client(region))
+			if err != nil {
+				err = fmt.Errorf("%s: %w", region, err)
+			}
+			found[i] = regionRead{certs: certs, err: err, done: true}
+		})
+	}
+	wg.Wait()
+	for i := range found {
+		if !found[i].done {
+			found[i].err = fmt.Errorf("%s: %w", regions[i], ctx.Err())
+		}
+	}
+	return found
 }
 
 // acmFindings turns ACM certificates into findings. A certificate that was
 // never issued, such as one pending validation, has no end date and is left
 // out.
-func acmFindings(certs []acm.Certificate, now time.Time, warn time.Duration) []scan.Finding {
+func acmFindings(certs []acm.Certificate, region string, now time.Time, warn time.Duration) []scan.Finding {
 	findings := make([]scan.Finding, 0, len(certs))
 	for _, cert := range certs {
 		if cert.NotAfter == nil {
@@ -117,6 +246,7 @@ func acmFindings(certs []acm.Certificate, now time.Time, warn time.Duration) []s
 		f := scan.Expiry(cert.Domain, *cert.NotAfter, now, warn)
 		f.ACM = &scan.ACMInfo{
 			ARN:                cert.ARN,
+			Region:             region,
 			Type:               cert.Type,
 			Imported:           cert.Imported(),
 			Status:             cert.Status,

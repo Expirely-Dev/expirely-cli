@@ -98,10 +98,12 @@ type GCPInfo struct {
 	InUseBy  []string `json:"in_use_by"`
 }
 
-// ACMInfo is what ACM says about one of its certificates. Imported is true
-// for a certificate ACM never renews.
+// ACMInfo is what ACM says about one of its certificates. Region is the
+// region that holds it. Imported is true for a certificate ACM never
+// renews.
 type ACMInfo struct {
 	ARN                string   `json:"arn"`
+	Region             string   `json:"region"`
 	Type               string   `json:"type"`
 	Imported           bool     `json:"imported"`
 	Status             string   `json:"status"`

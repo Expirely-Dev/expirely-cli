@@ -62,8 +62,8 @@ func TestCloudCommandsShowProgressOnlyToAPersonAtATerminal(t *testing.T) {
 					StdoutIsTerminal: true,
 					StderrIsTerminal: r.terminal,
 					Getenv:           envOf(r.env),
-					NewACM: func(context.Context, string, string) (acm.API, string, error) {
-						return slowACM{sampleACM()}, "us-east-1", nil
+					NewACM: func(context.Context, string, string) (acm.Account, error) {
+						return fakeAccount{region: "us-east-1", fallback: slowACM{sampleACM()}}, nil
 					},
 					NewGCP: func(context.Context) (*gcp.Service, error) {
 						return &gcp.Service{Client: &http.Client{Transport: &slowTransport{}}, ComputeEndpoint: endpoint.Compute, CertificateManagerEndpoint: endpoint.CertificateManager}, nil

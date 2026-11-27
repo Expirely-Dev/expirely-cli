@@ -49,9 +49,9 @@ type Streams struct {
 	StderrIsTerminal bool
 	Style            ui.Style
 	Getenv           func(string) string
-	// NewACM builds the ACM client of expirely aws; nil builds the real
+	// NewACM opens the AWS account expirely aws reads; nil opens the real
 	// one from the AWS configuration. Tests set it to a fake.
-	NewACM func(ctx context.Context, profile, region string) (acm.API, string, error)
+	NewACM func(ctx context.Context, profile, region string) (acm.Account, error)
 	// NewGCP builds the Compute client of expirely gcp; nil builds the real
 	// one from Application Default Credentials. Tests point it at a fake.
 	NewGCP func(ctx context.Context) (*gcp.Service, error)

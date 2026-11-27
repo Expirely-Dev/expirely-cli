@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -55,6 +56,29 @@ func sampleACM() fakeACM {
 	}
 }
 
+// fakeAccount answers Client with the client of each region in clients,
+// or fallback for a region it does not name.
+type fakeAccount struct {
+	region     string
+	clients    map[string]acm.API
+	fallback   acm.API
+	regions    []string
+	regionsErr error
+}
+
+func (f fakeAccount) Region() string { return f.region }
+
+func (f fakeAccount) Client(region string) acm.API {
+	if c, ok := f.clients[region]; ok {
+		return c
+	}
+	return f.fallback
+}
+
+func (f fakeAccount) EnabledRegions(context.Context) ([]string, error) {
+	return f.regions, f.regionsErr
+}
+
 type acmCall struct{ profile, region string }
 
 func runAWSWith(t *testing.T, terminal bool, f fakeACM, region string, args ...string) (code int, stdout, stderr string, call acmCall) {
@@ -65,12 +89,9 @@ func runAWSWith(t *testing.T, terminal bool, f fakeACM, region string, args ...s
 		Stdout:           &out,
 		Stderr:           &errOut,
 		StdoutIsTerminal: terminal,
-		NewACM: func(_ context.Context, profile, r string) (acm.API, string, error) {
+		NewACM: func(_ context.Context, profile, r string) (acm.Account, error) {
 			call = acmCall{profile, r}
-			if r == "" {
-				r = region
-			}
-			return f, r, nil
+			return fakeAccount{region: region, fallback: f}, nil
 		},
 	})
 	return code, out.String(), errOut.String(), call
@@ -198,7 +219,7 @@ func TestACMFindings(t *testing.T) {
 		{ARN: "arn:3", Domain: "pending.example.com", Type: "AMAZON_ISSUED", Status: "PENDING_VALIDATION"},
 	}
 
-	got := acmFindings(certs, now, 30*day)
+	got := acmFindings(certs, "us-east-1", now, 30*day)
 
 	if len(got) != 2 {
 		t.Fatalf("len(findings) = %d, want 2; a certificate never issued has no end date", len(got))
@@ -208,5 +229,167 @@ func TestACMFindings(t *testing.T) {
 	}
 	if f := got[1]; f.Status != scan.StatusOK || f.ACM.Imported || f.ACM.InUseBy == nil {
 		t.Errorf("findings[1] = %+v, acm = %+v; want an ok ACM-issued certificate with an empty in_use_by", f, f.ACM)
+	}
+}
+
+func okACMCert(arn, domain string) fakeACM {
+	notAfter := time.Now().AddDate(0, 0, 200)
+	return fakeACM{summaries: []types.CertificateSummary{
+		{CertificateArn: aws.String(arn), DomainName: aws.String(domain), Type: types.CertificateTypeAmazonIssued, Status: types.CertificateStatusIssued, RenewalEligibility: types.RenewalEligibilityEligible, NotAfter: &notAfter},
+	}}
+}
+
+func runAWSAccount(t *testing.T, terminal bool, acct fakeAccount, args ...string) (code int, stdout, stderr string, call acmCall) {
+	t.Helper()
+	var out, errOut bytes.Buffer
+	code = Run(context.Background(), append([]string{"aws"}, args...), Streams{
+		Stdin:            strings.NewReader(""),
+		Stdout:           &out,
+		Stderr:           &errOut,
+		StdoutIsTerminal: terminal,
+		NewACM: func(_ context.Context, profile, region string) (acm.Account, error) {
+			call = acmCall{profile, region}
+			return acct, nil
+		},
+	})
+	return code, out.String(), errOut.String(), call
+}
+
+type awsReport struct {
+	Unreadable []string `json:"unreadable"`
+	Results    []struct {
+		Target string `json:"target"`
+		ACM    struct {
+			Region string `json:"region"`
+		} `json:"acm"`
+	} `json:"results"`
+}
+
+func decodeAWS(t *testing.T, stdout, stderr string) awsReport {
+	t.Helper()
+	var r awsReport
+	if err := json.Unmarshal([]byte(stdout), &r); err != nil {
+		t.Fatalf("stdout is not the JSON report: %v\nstdout: %s\nstderr: %s", err, stdout, stderr)
+	}
+	return r
+}
+
+func regionsOf(r awsReport) string {
+	var got []string
+	for _, res := range r.Results {
+		got = append(got, res.Target+"@"+res.ACM.Region)
+	}
+	sort.Strings(got)
+	return strings.Join(got, ",")
+}
+
+func TestAWSEveryRegion(t *testing.T) {
+	denied := &smithy.GenericAPIError{Code: "AccessDeniedException", Message: "explicit deny in a service control policy"}
+	acct := fakeAccount{
+		region:  "eu-west-1",
+		regions: []string{"ap-south-1", "eu-west-1", "us-east-1"},
+		clients: map[string]acm.API{
+			"us-east-1":  okACMCert("arn:cf", "cdn.example.com"),
+			"eu-west-1":  okACMCert("arn:alb", "api.example.com"),
+			"ap-south-1": fakeACM{listErr: denied},
+		},
+	}
+
+	t.Run("json", func(t *testing.T) {
+		code, stdout, stderr, call := runAWSAccount(t, false, acct, "--region", "all")
+
+		r := decodeAWS(t, stdout, stderr)
+		if got, want := regionsOf(r), "api.example.com@eu-west-1,cdn.example.com@us-east-1"; got != want {
+			t.Errorf("results = %s, want %s: every readable region, each result naming its region", got, want)
+		}
+		if strings.Join(r.Unreadable, ",") != "acm:ap-south-1" {
+			t.Errorf("unreadable = %v, want [acm:ap-south-1]", r.Unreadable)
+		}
+		if code != ExitFailure {
+			t.Errorf("exit code = %d, want %d: the certificates read are ok, but a region was not read", code, ExitFailure)
+		}
+		if call.region != "" {
+			t.Errorf("account opened with region %q, want none for every region", call.region)
+		}
+	})
+	t.Run("text", func(t *testing.T) {
+		_, stdout, stderr, _ := runAWSAccount(t, true, acct, "--region", "all")
+
+		if !strings.Contains(stdout, "cdn.example.com") || !strings.Contains(stdout, "api.example.com") {
+			t.Errorf("stdout = %q, want both certificates", stdout)
+		}
+		if !strings.Contains(stderr, "could not read acm:ap-south-1") {
+			t.Errorf("stderr = %q, want the region it could not read", stderr)
+		}
+	})
+}
+
+func TestAWSRegionList(t *testing.T) {
+	acct := fakeAccount{clients: map[string]acm.API{
+		"us-east-1": okACMCert("arn:cf", "cdn.example.com"),
+		"eu-west-1": okACMCert("arn:alb", "api.example.com"),
+	}, fallback: fakeACM{listErr: errors.New("this region was not asked for")}}
+
+	code, stdout, stderr, _ := runAWSAccount(t, false, acct, "--region", "us-east-1, eu-west-1,us-east-1")
+
+	r := decodeAWS(t, stdout, stderr)
+	if got, want := regionsOf(r), "api.example.com@eu-west-1,cdn.example.com@us-east-1"; got != want || len(r.Unreadable) != 0 {
+		t.Errorf("results = %s, unreadable = %v; want %s from the two regions named, once each", got, r.Unreadable, want)
+	}
+	if code != ExitOK {
+		t.Errorf("exit code = %d, want 0; stderr = %s", code, stderr)
+	}
+}
+
+func TestAWSRegionErrors(t *testing.T) {
+	denied := &smithy.GenericAPIError{Code: "AccessDeniedException", Message: "not authorized to perform account:ListRegions"}
+	tests := []struct {
+		name     string
+		acct     fakeAccount
+		args     []string
+		wantCode int
+		wantErr  string
+	}{
+		{
+			name:     "not a region",
+			acct:     fakeAccount{fallback: sampleACM()},
+			args:     []string{"--region", "us-east1"},
+			wantCode: ExitUsage,
+			wantErr:  CodeInvalidFlag,
+		},
+		{
+			name:     "regions cannot be listed",
+			acct:     fakeAccount{regionsErr: denied},
+			args:     []string{"--region", "all"},
+			wantCode: ExitFailure,
+			wantErr:  CodeAWSAccessDenied,
+		},
+		{
+			name:     "no region can be read",
+			acct:     fakeAccount{regions: []string{"eu-west-1", "us-east-1"}, fallback: fakeACM{listErr: &smithy.GenericAPIError{Code: "UnrecognizedClientException"}}},
+			args:     []string{"--region", "all"},
+			wantCode: ExitFailure,
+			wantErr:  CodeAWSAccessDenied,
+		},
+		{
+			name:     "no enabled region",
+			acct:     fakeAccount{},
+			args:     []string{"--region", "all"},
+			wantCode: ExitFailure,
+			wantErr:  CodeAWSRequestFailed,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			code, stdout, stderr, _ := runAWSAccount(t, false, tt.acct, tt.args...)
+
+			var env envelope
+			if err := json.Unmarshal([]byte(stderr), &env); err != nil || env.Error.Code != tt.wantErr || code != tt.wantCode {
+				t.Errorf("exit code = %d, stderr = %s; want %d and the %q envelope", code, stderr, tt.wantCode, tt.wantErr)
+			}
+			if stdout != "" {
+				t.Errorf("stdout = %q, want empty", stdout)
+			}
+		})
 	}
 }

@@ -3,10 +3,11 @@ title: expirely aws
 description: List the certificates in AWS Certificate Manager and when they expire.
 ---
 
-`expirely aws` reads every certificate in AWS Certificate Manager for one account and region, and reports each one the way a scan reports a target: its status, the days left and the date it expires. It reads with two API calls and changes nothing.
+`expirely aws` reads every certificate in AWS Certificate Manager for one account, in one region, a list of regions or every enabled region, and reports each one the way a scan reports a target: its status, the days left and the date it expires. It only reads, and changes nothing.
 
 ```sh
 expirely aws --profile production --region us-east-1
+expirely aws --profile production --region all
 AWS_PROFILE=production expirely aws --warn-days 21
 expirely aws --json | jq '.results[] | select(.acm.imported and .status != "ok")'
 ```
@@ -14,7 +15,7 @@ expirely aws --json | jq '.results[] | select(.acm.imported and .status != "ok")
 | Flag                 | Description                                                                                     |
 | -------------------- | ----------------------------------------------------------------------------------------------- |
 | `--profile NAME`     | Profile from the shared AWS config. Default `AWS_PROFILE`, or the default credential chain      |
-| `--region REGION`    | Region to read. Default `AWS_REGION`, or the profile's region                                    |
+| `--region REGION`    | Region to read, a comma list such as `us-east-1,eu-west-1`, or `all` for every region enabled in the account. Default `AWS_REGION`, or the profile's region |
 | `--warn-days N`      | Report certificates that expire within `N` days as `expiring`, `0` or more. Default `30`        |
 | `--timeout DURATION` | Time allowed to read ACM, such as `1m`. Default `30s`                                            |
 | `--fields LIST`      | Keep only these keys in each JSON result, in the order the report prints them; `target` is always kept, and a key with no value is `null`. A comma list, or the flag repeated. Needs JSON output |
@@ -44,7 +45,7 @@ A certificate that was never issued, such as one pending validation, has no end 
 
 ## Permissions
 
-`expirely aws` calls `acm:ListCertificates` and `acm:DescribeCertificate`. This policy is enough:
+`expirely aws` calls `acm:ListCertificates` and `acm:DescribeCertificate`, and with `--region all` also `account:ListRegions` to find the regions enabled in the account. This policy is enough for every form:
 
 ```json
 {
@@ -52,14 +53,14 @@ A certificate that was never issued, such as one pending validation, has no end 
   "Statement": [
     {
       "Effect": "Allow",
-      "Action": ["acm:ListCertificates", "acm:DescribeCertificate"],
+      "Action": ["acm:ListCertificates", "acm:DescribeCertificate", "account:ListRegions"],
       "Resource": "*"
     }
   ]
 }
 ```
 
-ACM certificates are regional, and CloudFront uses those in `us-east-1`. Run `expirely aws` once per region that holds certificates.
+ACM certificates are regional: CloudFront uses those in `us-east-1`, and a load balancer those in its own region. `--region all` reads every region enabled in the account, eight at a time, within one `--timeout`. A region it cannot read, such as one a service control policy denies, goes to `unreadable` and the others are still reported; an organization that denies unused regions reads only the ones it uses with a list, such as `--region us-east-1,eu-west-1`.
 
 ## Output
 
@@ -68,6 +69,7 @@ The JSON report is the one in [Output](/reference/output). Each result has an `a
 | Field                     | Meaning                                                              |
 | ------------------------- | -------------------------------------------------------------------- |
 | `acm.arn`                 | The certificate's ARN                                                |
+| `acm.region`              | The region that holds it                                             |
 | `acm.type`                | `AMAZON_ISSUED`, `IMPORTED` or `PRIVATE`                             |
 | `acm.imported`            | `true` for a certificate ACM never renews                            |
 | `acm.status`              | ACM's status, such as `ISSUED` or `EXPIRED`                          |
@@ -78,4 +80,4 @@ While ACM is read for longer than 150 ms, stderr shows `Reading ACM in REGION` a
 
 ## Exit codes
 
-The same as a scan: `0` when every certificate is `ok`, `1` when one is `expired` or `expiring`. A missing region or profile exits `2` with `aws_not_configured`; refused credentials or missing permissions exit `3` with `aws_access_denied`, and any other AWS failure exits `3` with `aws_request_failed`. Each code is in [Error codes](/reference/error-codes).
+The same as a scan: `0` when every certificate is `ok`, `1` when one is `expired` or `expiring`. A missing region or profile exits `2` with `aws_not_configured`; refused credentials or missing permissions exit `3` with `aws_access_denied`, and any other AWS failure exits `3` with `aws_request_failed`. With several regions, a region that fails does not fail the run: expirely reports the certificates it read, names that region in `unreadable` as `acm:REGION` (on stderr in text), and exits `3` unless a certificate it read exits `1`. Only when no region can be read does the run fail with the error of the first one. Each code is in [Error codes](/reference/error-codes).

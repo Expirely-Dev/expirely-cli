@@ -33,8 +33,8 @@ func TestRunStopsWhenInterrupted(t *testing.T) {
 				Stdin:  strings.NewReader(""),
 				Stdout: &out,
 				Stderr: &errOut,
-				NewACM: func(context.Context, string, string) (acm.API, string, error) {
-					return sampleACM(), "us-east-1", nil
+				NewACM: func(context.Context, string, string) (acm.Account, error) {
+					return fakeAccount{region: "us-east-1", fallback: sampleACM()}, nil
 				},
 				NewGCP: func(context.Context) (*gcp.Service, error) {
 					return &gcp.Service{Client: http.DefaultClient, ComputeEndpoint: endpoint.Compute, CertificateManagerEndpoint: endpoint.CertificateManager}, nil
