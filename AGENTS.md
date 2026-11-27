@@ -5,6 +5,7 @@ Rules for agents working in this repository. User documentation is the Mintlify 
 ## Contract
 
 - Exit codes, error codes, flags and JSON field names are a public contract that CI pipelines and agents parse. A change to any of them updates its page under `docs/cli/commands` or `docs/cli/reference` in the same commit, and `just docs-check` passes; tests in `internal/cli` fail when a code or a flag in the usage text is missing there.
+- `manifest.json` at the repository root is that contract as data: every command with its flags, the exit codes, the error codes with their cause and remediation, the statuses and the result fields. `TestManifest` in `internal/cli` builds it from the flag sets, the help texts and the code tables, and fails when the file differs, when a command parses a flag its help leaves out, or when the help documents one the command does not parse. After such a change, run `just manifest` and read the diff. The documentation site renders its reference tables from the manifest of the release it documents, so the description of a flag is written once, in the help text.
 - Results go to stdout and errors to stderr. Output is JSON when `--json` is set or stdout is not a terminal; text otherwise. In JSON, an error is `{"error":{"message":"...","code":"..."}}`.
 - Error codes are snake_case and live in one table in `internal/cli`; every error a command returns carries one of them.
 - A value the scan could not read is `null` in JSON and `unknown` in text, never zero or a default date.

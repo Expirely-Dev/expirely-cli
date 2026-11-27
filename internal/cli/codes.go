@@ -24,6 +24,37 @@ const (
 	CodeOutputFailed       = "output_failed"
 )
 
+// causes says, for every error code, what went wrong, in one sentence. The
+// manifest carries them, and the documentation site renders its table of
+// error codes from it.
+var causes = map[string]string{
+	CodeInvalidFlag:        "A flag is unknown or has a value it does not take.",
+	CodeUnknownCommand:     "The first argument is not a command, or expirely help got a command there is no help for.",
+	CodeUnexpectedArgument: "expirely tls aws or expirely tls gcp got an argument that is not a flag, such as a target.",
+	CodeInvalidTarget:      "A target is not a host, host:port or https:// URL.",
+	CodeMissingArguments:   "No target was given in the arguments or files.",
+	CodeFileUnreadable:     "A --file could not be opened or read, or has a line over 64 KiB.",
+	CodeInvalidCAFile:      "A --ca-file could not be read, holds no PEM certificate, or holds one that does not parse.",
+	CodeAWSNotConfigured:   "expirely tls aws found no region in --region, AWS_REGION or the profile, or the profile does not exist in the shared AWS config.",
+	CodeAWSAccessDenied:    "AWS refused the credentials, they expired, or they lack the ACM read permissions.",
+	CodeAWSRequestFailed:   "Another AWS failure, such as a timeout or a throttled request.",
+	CodeGCPNotConfigured:   "expirely tls gcp found no project, or no Application Default Credentials.",
+	CodeGCPAccessDenied:    "Google Cloud refused the credentials, or they lack the Compute or Certificate Manager list permissions.",
+	CodeGCPComputeDisabled: "The project has the Compute Engine API or billing disabled, so it serves no Compute SSL certificates.",
+	CodeGCPRequestFailed:   "Another Google Cloud failure, such as a timeout or a server error.",
+	CodeInterrupted:        "The run was stopped, as Ctrl-C does, before it ended; it printed no results, since partial ones would read as complete.",
+	CodeOutputFailed:       "Writing the result to stdout failed, for example a closed pipe.",
+}
+
+// exitMeanings says what each exit code of Run means.
+var exitMeanings = map[int]string{
+	ExitOK:          "Every result is ok, or --help or --version ran.",
+	ExitFindings:    "At least one certificate is expired, revoked or expiring.",
+	ExitUsage:       "Usage error: unknown command, bad flag, invalid target, unreadable --file or no targets.",
+	ExitFailure:     "At least one target could not be read, an end date is unknown, a cloud command could not read every region, or writing the output failed.",
+	ExitInterrupted: "Stopped by Ctrl-C before the end; no results were printed.",
+}
+
 // remediations says, for every error code, what resolves it. They are
 // declarative and never repeat what the user typed: an agent reads them as
 // facts about the tool, not as instructions from it.

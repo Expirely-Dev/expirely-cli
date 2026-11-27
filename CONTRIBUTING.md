@@ -11,6 +11,7 @@ just fmt
 just check      # offline: gofmt, vet, golangci-lint, actionlint, race tests, build, tidy, goreleaser check
 just check-ci   # what CI runs: check plus govulncheck
 just fuzz       # fuzz the target parser for 60s (just fuzz 5m for longer)
+just manifest   # rewrite manifest.json after a change to a flag, a help text, a code or a status
 just build      # build ./bin/expirely
 ```
 
