@@ -2,6 +2,20 @@
 
 Every release of expirely, newest first. From v0.4.0 on, release-please writes this file from the commit titles. Until 1.0, a release can change flags, JSON fields and codes; such a change is listed as breaking, with what to do.
 
+## [0.7.0](https://github.com/bycavii/expirely-cli/compare/v0.6.0...v0.7.0) (2026-11-27)
+
+
+### Added
+
+* **aws:** read every enabled region with --region all ([cd7f1b3](https://github.com/bycavii/expirely-cli/commit/cd7f1b33c87e3cb173f4285178ad38a671bb8d05))
+* write a job summary and annotations in github actions ([cb84576](https://github.com/bycavii/expirely-cli/commit/cb845769c8e769f69824d105715bb63ba8ea9768))
+
+
+### Fixed
+
+* **aws:** find the enabled regions with ec2:DescribeRegions ([9009144](https://github.com/bycavii/expirely-cli/commit/900914444495dadbe7339c49d0bc7a4232c56a35))
+* name unknown flags as typed and suggest the closest one ([2340409](https://github.com/bycavii/expirely-cli/commit/2340409c7f8edbb5697193f2782fd65d7957dbdf))
+
 ## [0.6.0](https://github.com/bycavii/expirely-cli/compare/v0.5.0...v0.6.0) (2026-11-27)
 
 
