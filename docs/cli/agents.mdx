@@ -17,7 +17,7 @@ expirely tls -f targets.txt | jq '.summary'
 { "error": 0, "expired": 1, "expiring": 0, "ok": 3, "total": 4 }
 ```
 
-Every field is described in [Output](/reference/output). A value that could not be read is `null`, never zero or a default date. The report starts with `summary`, `filter`, `matched`, `truncated` and `unreadable`, so an agent that reads only the first lines of a long scan still sees the counts and whether it has every result, and it leaves each certificate chain out unless `--details` asks for it.
+Every field is described in [Output](/cli/reference/output). A value that could not be read is `null`, never zero or a default date. The report starts with `summary`, `filter`, `matched`, `truncated` and `unreadable`, so an agent that reads only the first lines of a long scan still sees the counts and whether it has every result, and it leaves each certificate chain out unless `--details` asks for it.
 
 ## Show only what needs attention
 
@@ -27,7 +27,7 @@ One result is about 1 KB of JSON, and agent harnesses cut long output: Claude Co
 expirely tls -f targets.txt --fields status,days_left,expires_at --limit 20
 ```
 
-`--fields` and `--limit` are in [Show less](/reference/output#show-less). The exit code always covers every result.
+`--fields` and `--limit` are in [Show less](/cli/reference/output#show-less). The exit code always covers every result.
 
 ## Agents on a terminal
 
@@ -64,7 +64,7 @@ A command error is one JSON line on stderr. A target that could not be read carr
 {"error":{"code":"invalid_target","message":"invalid target \"http://example.com\": scheme \"http\" does not use TLS; only https:// does","remediation":"A target is host, host:port, [ipv6]:port or https://host/path; the port defaults to 443."}}
 ```
 
-Every error also carries a `remediation`: what resolves it, stated as a fact about the tool rather than an instruction, so an agent harness does not read it as prompt injection, and never repeating what was typed. Messages, reasons and remediations are for people and can change. Codes and `tls.trust_issue` values are never renamed or reused; they are listed in [Error codes](/reference/error-codes) and [Output](/reference/output).
+Every error also carries a `remediation`: what resolves it, stated as a fact about the tool rather than an instruction, so an agent harness does not read it as prompt injection, and never repeating what was typed. Messages, reasons and remediations are for people and can change. Codes and `tls.trust_issue` values are never renamed or reused; they are listed in [Error codes](/cli/reference/error-codes) and [Output](/cli/reference/output).
 
 ## Safe to run
 

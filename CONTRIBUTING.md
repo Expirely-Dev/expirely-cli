@@ -23,7 +23,7 @@ just docs-check   # MDX, navigation and broken links, as the docs workflow runs
 
 ## Pull requests
 
-Titles follow Conventional Commits: `<type>(<scope>): <summary>`, imperative, lowercase, at most 72 characters, because release-please reads them to choose the next version. A change to a flag, a JSON field, an exit code or an error code updates `docs/cli/expirely.mdx` or its page under `docs/reference` in the same pull request.
+Titles follow Conventional Commits: `<type>(<scope>): <summary>`, imperative, lowercase, at most 72 characters, because release-please reads them to choose the next version. A change to a flag, a JSON field, an exit code or an error code updates its page under `docs/cli/commands` or `docs/cli/reference` in the same pull request.
 
 ## Release
 

@@ -67,7 +67,7 @@ ACM certificates are regional: CloudFront uses those in `us-east-1`, and a load 
 
 ## Output
 
-The JSON report is the one in [Output](/reference/output). Each result has `source` `aws_acm`, an `acm` object, and a `tls` object whose fields are `null`, since ACM does not verify the chain for a host:
+The JSON report is the one in [Output](/cli/reference/output). Each result has `source` `aws_acm`, an `acm` object, and a `tls` object whose fields are `null`, since ACM does not verify the chain for a host:
 
 | Field                     | Meaning                                                              |
 | ------------------------- | -------------------------------------------------------------------- |
@@ -84,4 +84,4 @@ While ACM is read for longer than 150 ms, stderr shows `Reading ACM in REGION` a
 
 ## Exit codes
 
-The same as a scan: `0` when every certificate is `ok`, `1` when one is `expired`, `revoked` or `expiring`. A certificate with an `unknown` end date exits `3` unless another exits `1`. A missing region or profile exits `2` with `aws_not_configured`; refused credentials or missing permissions exit `3` with `aws_access_denied`, and any other AWS failure exits `3` with `aws_request_failed`. With several regions, a region that fails does not fail the run: expirely reports the certificates it read, names that region in `unreadable` as `acm:REGION` (on stderr in text), and exits `3` unless a certificate it read exits `1`. Only when no region can be read does the run fail with the error of the first one. Each code is in [Error codes](/reference/error-codes).
+The same as a scan: `0` when every certificate is `ok`, `1` when one is `expired`, `revoked` or `expiring`. A certificate with an `unknown` end date exits `3` unless another exits `1`. A missing region or profile exits `2` with `aws_not_configured`; refused credentials or missing permissions exit `3` with `aws_access_denied`, and any other AWS failure exits `3` with `aws_request_failed`. With several regions, a region that fails does not fail the run: expirely reports the certificates it read, names that region in `unreadable` as `acm:REGION` (on stderr in text), and exits `3` unless a certificate it read exits `1`. Only when no region can be read does the run fail with the error of the first one. Each code is in [Error codes](/cli/reference/error-codes).

@@ -352,14 +352,14 @@ func readDoc(t *testing.T, name string) []byte {
 }
 
 func TestDocsListEveryCode(t *testing.T) {
-	doc := readDoc(t, filepath.Join("reference", "error-codes.mdx"))
+	doc := readDoc(t, filepath.Join("cli", "reference", "error-codes.mdx"))
 	codes := []string{scan.CodeDialFailed, scan.CodeHandshakeFailed}
 	for code := range errorCodes {
 		codes = append(codes, code)
 	}
 	for _, code := range codes {
 		if !bytes.Contains(doc, []byte("| `"+code+"` |")) {
-			t.Errorf("docs/reference/error-codes.mdx has no table row for code %q", code)
+			t.Errorf("docs/cli/reference/error-codes.mdx has no table row for code %q", code)
 		}
 	}
 }
@@ -369,10 +369,10 @@ func TestDocsListEveryFlag(t *testing.T) {
 		help string
 		page string
 	}{
-		{rootUsage, filepath.Join("cli", "expirely.mdx")},
-		{tlsUsage, filepath.Join("cli", "tls.mdx")},
-		{awsUsage, filepath.Join("cli", "tls-aws.mdx")},
-		{gcpUsage, filepath.Join("cli", "tls-gcp.mdx")},
+		{rootUsage, filepath.Join("cli", "commands", "expirely.mdx")},
+		{tlsUsage, filepath.Join("cli", "commands", "tls.mdx")},
+		{awsUsage, filepath.Join("cli", "commands", "tls-aws.mdx")},
+		{gcpUsage, filepath.Join("cli", "commands", "tls-gcp.mdx")},
 	}
 	for _, p := range pages {
 		doc := readDoc(t, p.page)

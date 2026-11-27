@@ -32,17 +32,17 @@
           {
             "group": "Get started",
             "pages": [
-              "introduction",
-              "install",
-              "quickstart",
-              "agents"
+              "cli/introduction",
+              "cli/install",
+              "cli/quickstart",
+              "cli/agents"
             ]
           },
           {
             "group": "Guides",
             "pages": [
-              "guides/targets",
-              "guides/ci"
+              "cli/guides/targets",
+              "cli/guides/ci"
             ]
           }
         ]
@@ -54,17 +54,17 @@
           {
             "group": "Commands",
             "pages": [
-              "cli/expirely",
-              "cli/tls",
-              "cli/tls-aws",
-              "cli/tls-gcp"
+              "cli/commands/expirely",
+              "cli/commands/tls",
+              "cli/commands/tls-aws",
+              "cli/commands/tls-gcp"
             ]
           },
           {
             "group": "Output and errors",
             "pages": [
-              "reference/output",
-              "reference/error-codes"
+              "cli/reference/output",
+              "cli/reference/error-codes"
             ]
           }
         ]
