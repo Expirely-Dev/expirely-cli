@@ -5,6 +5,11 @@ Every release of expirely, newest first. From v0.4.0 on, release-please writes t
 ## [0.6.0](https://github.com/bycavii/expirely-cli/compare/v0.5.0...v0.6.0) (2026-11-27)
 
 
+### Breaking changes
+
+* JSON results come most urgent first instead of in the order the targets were given; sort on `target` to restore the old order.
+* A declared AI agent (`EXPIRELY_AGENT`, `AI_AGENT`, `AGENT` or a Codex marker) now gets `expired`, `expiring` and `error` results by default; pass `--status all` to get every status. The `summary` counts and the exit code still cover every result.
+
 ### Added
 
 * add --status, --fields and --limit to every command ([fdc89c7](https://github.com/bycavii/expirely-cli/commit/fdc89c7705bee8bc6a0031e59bd3c04a0ee2bc7f))

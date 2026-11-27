@@ -30,9 +30,9 @@ Titles follow Conventional Commits: `<type>(<scope>): <summary>`, imperative, lo
 Releases are automated with [release-please](https://github.com/googleapis/release-please). Every push to `main` updates a release pull request that holds the next version and its `CHANGELOG.md` section, both computed from the commit titles since the last release:
 
 - `feat` raises the minor version, `fix` and `perf` the patch version;
-- before 1.0, a breaking change (`!` after the type, and a `BREAKING CHANGE:` footer) raises the minor version;
+- before 1.0, a breaking change (`!` after the type, and a `BREAKING CHANGE:` footer saying how to migrate) raises the minor version and is listed under Breaking changes. release-please reads the footer from the commit on `main`, so a squash merge keeps the body and footer, not only the title;
 - `docs`, `build`, `ci`, `chore`, `refactor` and `test` release nothing and stay out of the changelog.
 
-Merging the release pull request tags the version and publishes its GitHub release. The same workflow then runs `just check-ci`, collects the third-party licenses and lets GoReleaser attach the archives and `checksums.txt` to that release, and `actions/attest` signs a SLSA build provenance attestation for every archive listed in `checksums.txt`. `just snapshot` builds the same archives into `./dist` without publishing.
+Merging the release pull request tags the version and publishes its GitHub release. The same workflow then runs `just check-ci`, collects the third-party licenses and lets GoReleaser attach the archives and `checksums.txt` to that release, and `actions/attest` signs a SLSA build provenance attestation for every archive listed in `checksums.txt`. Last, the `homebrew` job starts `publish-release.yml` in [bycavii/homebrew-tap](https://github.com/bycavii/homebrew-tap) through the bycavii GitHub App; that workflow verifies the attestations, updates the formula and opens a pull request, and merging it publishes the version to `brew install bycavii/tap/expirely`. `just snapshot` builds the same archives into `./dist` without publishing.
 
 Since commit titles choose the version, CI rejects a title outside `<type>(<scope>): <summary>`; `just commit-check <range>` runs the same check locally.
