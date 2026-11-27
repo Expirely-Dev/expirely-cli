@@ -53,8 +53,8 @@ func TestGCPText(t *testing.T) {
 			t.Errorf("stdout = %q, want it to contain %q", stdout, want)
 		}
 	}
-	if strings.Contains(stdout, "new.example.com") {
-		t.Errorf("stdout lists a managed certificate not issued yet:\n%s", stdout)
+	if !strings.Contains(stdout, "unknown") || !strings.Contains(stdout, "new.example.com") || !strings.Contains(stdout, "provisioning") {
+		t.Errorf("stdout = %q, want the managed certificate not issued yet as unknown, provisioning", stdout)
 	}
 }
 
@@ -70,8 +70,8 @@ func TestGCPJSONAndProjectFromEnvironment(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout), &got); err != nil {
 		t.Fatalf("stdout is not the JSON report: %v\nstderr: %s", err, stderr)
 	}
-	if len(got.Results) != 5 {
-		t.Fatalf("len(results) = %d, want 5 issued certificates", len(got.Results))
+	if len(got.Results) != 6 {
+		t.Fatalf("len(results) = %d, want 6: five issued certificates and one provisioning", len(got.Results))
 	}
 	sources := map[string]int{}
 	for _, r := range got.Results {
@@ -83,8 +83,8 @@ func TestGCPJSONAndProjectFromEnvironment(t *testing.T) {
 		}
 		sources[info.Source]++
 	}
-	if sources["compute"] != 3 || sources["certificate_manager"] != 2 {
-		t.Errorf("sources = %v, want 3 compute and 2 certificate_manager", sources)
+	if sources["compute"] != 4 || sources["certificate_manager"] != 2 {
+		t.Errorf("sources = %v, want 4 compute, one of them provisioning, and 2 certificate_manager", sources)
 	}
 }
 
@@ -145,13 +145,19 @@ func TestGCPFindings(t *testing.T) {
 	soon := now.Add(12 * day)
 	certs := []gcp.Certificate{
 		{Name: "api-cert", Domain: "api.example.com", Location: "global", NotAfter: &soon},
-		{Name: "pending", Domain: "new.example.com", Location: "global", Managed: true},
+		{Name: "pending", Domain: "new.example.com", Location: "global", Managed: true, State: "PROVISIONING"},
 	}
 
 	got := gcpFindings(certs, now, 30*day)
 
-	if len(got) != 1 {
-		t.Fatalf("len(findings) = %d, want 1; a certificate not issued yet has no end date", len(got))
+	if len(got) != 2 {
+		t.Fatalf("len(findings) = %d, want 2; a certificate not issued yet is reported, not left out", len(got))
+	}
+	if f := got[1]; f.Target != "new.example.com" || f.Status != scan.StatusUnknown || f.DaysLeft != nil || f.ExpiresAt != nil || f.GCP.State == nil || *f.GCP.State != "PROVISIONING" {
+		t.Errorf("findings[1] = %+v, gcp = %+v; want an unknown certificate with no end date and state PROVISIONING", f, f.GCP)
+	}
+	if f := got[0]; f.GCP.State != nil {
+		t.Errorf("findings[0].gcp.state = %q, want nil for a self-managed certificate", *f.GCP.State)
 	}
 	if f := got[0]; f.Target != "api.example.com" || f.Status != scan.StatusExpiring || f.GCP.Managed || f.GCP.InUseBy == nil || f.Source != scan.SourceGCP || f.TLS.Trusted != nil {
 		t.Errorf("findings[0] = %+v, gcp = %+v; want an expiring self-managed certificate, an empty in_use_by and no trust fields", f, f.GCP)

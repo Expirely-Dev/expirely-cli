@@ -41,7 +41,7 @@ ACM renews the certificates it issues while they are eligible. It never renews a
 
 Notes about a certificate in use are highlighted, and within the same status a certificate in use is listed before one that nothing uses: an expired certificate still in use is a likely outage, while an expired one nothing uses is clean-up.
 
-A certificate that was never issued, such as one pending validation, has no end date and is left out.
+A certificate that was never issued, such as one pending validation, has no end date. It is reported as `unknown`, with ACM's status as its note, such as `pending validation`, `failed` or `validation timed out`, and makes the run exit `3`. A request that will not be completed is deleted in ACM, which removes it from the report.
 
 ## Permissions
 
@@ -72,7 +72,7 @@ The JSON report is the one in [Output](/reference/output). Each result has `sour
 | `acm.region`              | The region that holds it                                             |
 | `acm.type`                | `AMAZON_ISSUED`, `IMPORTED` or `PRIVATE`                             |
 | `acm.imported`            | `true` for a certificate ACM never renews                            |
-| `acm.status`              | ACM's status, such as `ISSUED` or `EXPIRED`                          |
+| `acm.status`              | ACM's status, such as `ISSUED`, `EXPIRED` or `PENDING_VALIDATION`    |
 | `acm.renewal_eligibility` | `ELIGIBLE` or `INELIGIBLE`                                           |
 | `acm.in_use_by`           | ARNs of the resources that use it; empty when none do                |
 
@@ -80,4 +80,4 @@ While ACM is read for longer than 150 ms, stderr shows `Reading ACM in REGION` a
 
 ## Exit codes
 
-The same as a scan: `0` when every certificate is `ok`, `1` when one is `expired` or `expiring`. A missing region or profile exits `2` with `aws_not_configured`; refused credentials or missing permissions exit `3` with `aws_access_denied`, and any other AWS failure exits `3` with `aws_request_failed`. With several regions, a region that fails does not fail the run: expirely reports the certificates it read, names that region in `unreadable` as `acm:REGION` (on stderr in text), and exits `3` unless a certificate it read exits `1`. Only when no region can be read does the run fail with the error of the first one. Each code is in [Error codes](/reference/error-codes).
+The same as a scan: `0` when every certificate is `ok`, `1` when one is `expired` or `expiring`. A certificate with an `unknown` end date exits `3` unless another exits `1`. A missing region or profile exits `2` with `aws_not_configured`; refused credentials or missing permissions exit `3` with `aws_access_denied`, and any other AWS failure exits `3` with `aws_request_failed`. With several regions, a region that fails does not fail the run: expirely reports the certificates it read, names that region in `unreadable` as `acm:REGION` (on stderr in text), and exits `3` unless a certificate it read exits `1`. Only when no region can be read does the run fail with the error of the first one. Each code is in [Error codes](/reference/error-codes).

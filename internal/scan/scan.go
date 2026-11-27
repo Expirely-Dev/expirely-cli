@@ -115,12 +115,15 @@ type TLSInfo struct {
 // GCPInfo is what Google Cloud says about one of a project's
 // certificates. Source is "compute" for a Compute SSL certificate and
 // "certificate_manager" for one in Certificate Manager. Managed is true for
-// a certificate Google renews.
+// a certificate Google renews. State is Google's provisioning state of a
+// managed certificate, such as ACTIVE or PROVISIONING; it is nil for a
+// self-managed one.
 type GCPInfo struct {
 	Name     string   `json:"name"`
 	Location string   `json:"location"`
 	Source   string   `json:"source"`
 	Managed  bool     `json:"managed"`
+	State    *string  `json:"state"`
 	InUseBy  []string `json:"in_use_by"`
 }
 
@@ -216,6 +219,13 @@ func Expiry(source, target string, notAfter, now time.Time, warn time.Duration) 
 	days := daysLeft(notAfter.Sub(now))
 	expires := notAfter.UTC()
 	return Finding{Kind: KindTLSCertificate, Source: source, Target: target, Status: status, DaysLeft: &days, ExpiresAt: &expires}
+}
+
+// Unknown returns the finding for a certificate read from source that has
+// no end date, such as one a provider has not issued yet. Its expiry and
+// TLS fields stay nil.
+func Unknown(source, target string) Finding {
+	return Finding{Kind: KindTLSCertificate, Source: source, Target: target, Status: StatusUnknown}
 }
 
 // Classify computes the finding for a probe result at now. The chain's

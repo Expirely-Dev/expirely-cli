@@ -111,6 +111,7 @@ func TestAWSText(t *testing.T) {
 		"  expired   api.example.org          770 days ago  ",
 		"  expired   old.example.com          900 days ago  ",
 		"  expiring  api.example.com          12 days       ",
+		"  unknown   pending.example.com      unknown       ",
 		"  ok        *.example.com            61 days       ",
 		"  ok        legacy.example.internal  203 days      ",
 	}
@@ -119,13 +120,10 @@ func TestAWSText(t *testing.T) {
 			t.Errorf("line %d = %q, want prefix %q", i+1, lines[i+1], prefix)
 		}
 	}
-	for _, note := range []string{"imported, in use by 2 resources", "renews itself", "imported, not in use", "does not renew, in use by 3 resources", "does not renew, not in use"} {
+	for _, note := range []string{"imported, in use by 2 resources", "renews itself", "imported, not in use", "does not renew, in use by 3 resources", "does not renew, not in use", "pending validation"} {
 		if !strings.Contains(stdout, note) {
 			t.Errorf("stdout = %q, want the note %q", stdout, note)
 		}
-	}
-	if strings.Contains(stdout, "pending.example.com") {
-		t.Errorf("stdout lists a certificate that was never issued:\n%s", stdout)
 	}
 }
 
@@ -141,8 +139,8 @@ func TestAWSJSON(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout), &got); err != nil {
 		t.Fatalf("stdout is not the JSON report: %v\n%s", err, stdout)
 	}
-	if len(got.Results) != 5 {
-		t.Fatalf("len(results) = %d, want 5; the certificate never issued is left out", len(got.Results))
+	if len(got.Results) != 6 {
+		t.Fatalf("len(results) = %d, want 6, the certificate never issued included", len(got.Results))
 	}
 	var info struct {
 		ARN      string   `json:"arn"`
@@ -157,8 +155,8 @@ func TestAWSJSON(t *testing.T) {
 		_ = json.Unmarshal(r["acm"], &a)
 		arns = append(arns, a.ARN)
 	}
-	if want := "arn:6,arn:5,arn:2,arn:1,arn:3"; strings.Join(arns, ",") != want {
-		t.Errorf("results order = %v, want %s: expired before expiring, in use before unused, fewest days first", arns, want)
+	if want := "arn:6,arn:5,arn:2,arn:4,arn:1,arn:3"; strings.Join(arns, ",") != want {
+		t.Errorf("results order = %v, want %s: expired, expiring, unknown, ok; in use before unused, fewest days first", arns, want)
 	}
 	if err := json.Unmarshal(got.Results[2]["acm"], &info); err != nil || info.ARN != "arn:2" || !info.Imported || len(info.InUseBy) != 2 {
 		t.Errorf("results[2].acm = %s, want the imported certificate used twice", got.Results[2]["acm"])
@@ -227,8 +225,11 @@ func TestACMFindings(t *testing.T) {
 
 	got := acmFindings(certs, "us-east-1", now, 30*day)
 
-	if len(got) != 2 {
-		t.Fatalf("len(findings) = %d, want 2; a certificate never issued has no end date", len(got))
+	if len(got) != 3 {
+		t.Fatalf("len(findings) = %d, want 3; a certificate never issued is reported, not left out", len(got))
+	}
+	if f := got[2]; f.Target != "pending.example.com" || f.Status != scan.StatusUnknown || f.DaysLeft != nil || f.ExpiresAt != nil || f.ACM == nil || f.ACM.Status != "PENDING_VALIDATION" {
+		t.Errorf("findings[2] = %+v, acm = %+v; want an unknown certificate with no end date and its ACM status", f, f.ACM)
 	}
 	if f := got[0]; f.Target != "api.example.com" || f.Status != scan.StatusExpiring || *f.DaysLeft != 12 || !f.ACM.Imported || len(f.ACM.InUseBy) != 2 {
 		t.Errorf("findings[0] = %+v, acm = %+v; want an expiring imported certificate used twice", f, f.ACM)

@@ -123,6 +123,8 @@ func detail(f scan.Finding) string {
 	switch {
 	case f.Error != nil:
 		return f.Error.Reason
+	case f.Status == scan.StatusUnknown && providerState(f) != "":
+		return "no end date: " + providerState(f)
 	case f.TLS.TrustIssue != nil && *f.TLS.TrustIssue != scan.TrustExpired:
 		return "not trusted: " + trustWords[*f.TLS.TrustIssue]
 	case f.ACM != nil:
