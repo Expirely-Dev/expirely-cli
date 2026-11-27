@@ -3,7 +3,7 @@ title: expirely tls
 description: Check the certificates TLS endpoints serve and when they expire.
 ---
 
-`expirely tls` reads its targets from the arguments and from each `--file`, scans them, prints one result per target and exits with a code that says whether anything needs attention. The target syntax is in [Scan targets](/guides/targets).
+`expirely tls` reads its targets from the arguments and from each `--file`, scans them, prints one result per target and exits with a code that says whether anything needs attention. The target syntax is in [Scan targets](/cli/guides/targets).
 
 ```sh
 expirely tls example.com api.example.com:8443
@@ -42,7 +42,7 @@ Each target gets one status:
 | `ok`       | It expires later than that                                 |
 | `error`    | The target could not be read                               |
 
-The status comes from the earliest `NotAfter` in the chain the server sends, so an intermediate that expires before the leaf is reported. Trust does not change the status: an untrusted chain far from expiry is `ok`, with `tls.trusted` false. A scan reads the end date of every chain it reaches, so it never reports `unknown`; that status comes from the cloud commands. All statuses are in [Output](/reference/output#status).
+The status comes from the earliest `NotAfter` in the chain the server sends, so an intermediate that expires before the leaf is reported. Trust does not change the status: an untrusted chain far from expiry is `ok`, with `tls.trusted` false. A scan reads the end date of every chain it reaches, so it never reports `unknown`; that status comes from the cloud commands. All statuses are in [Output](/cli/reference/output#status).
 
 ## Revocation
 
@@ -50,7 +50,7 @@ Without `--revocation`, expirely does not look at revocation: a revoked certific
 
 With it, a certificate its CA revoked gets the status `revoked` and the run exits `1`, as for an expired one: browsers that check revocation refuse it today. A certificate that is both is `expired`.
 
-For each chain that verifies, expirely reads the first `http://` or `https://` CRL URL in the leaf, fetches that list from the CA, verifies its signature against the issuer certificate the server sent, and looks up the leaf's serial number. Each CRL is fetched once per run, within `--timeout`, up to 10 MiB, and never through a redirect to another host. The result is `tls.revocation`, described in [Output](/reference/output#tls):
+For each chain that verifies, expirely reads the first `http://` or `https://` CRL URL in the leaf, fetches that list from the CA, verifies its signature against the issuer certificate the server sent, and looks up the leaf's serial number. Each CRL is fetched once per run, within `--timeout`, up to 10 MiB, and never through a redirect to another host. The result is `tls.revocation`, described in [Output](/cli/reference/output#tls):
 
 - `good`: the CRL does not list the certificate.
 - `revoked`: the CRL lists it; `reason` says when it was revoked.
@@ -60,7 +60,7 @@ The CRL of a chain that does not verify is never fetched. Its URL was written by
 
 ## Output
 
-Results go to stdout and errors to stderr. The output is JSON when `--json` is set or stdout is not a terminal, and text otherwise. JSON lists results most urgent first, the same order as the text, and is described in [Output](/reference/output). `--status`, `--fields` and `--limit` change what is shown, never the counts in `summary` or the exit code; [Show less](/reference/output#show-less) has the rules.
+Results go to stdout and errors to stderr. The output is JSON when `--json` is set or stdout is not a terminal, and text otherwise. JSON lists results most urgent first, the same order as the text, and is described in [Output](/cli/reference/output). `--status`, `--fields` and `--limit` change what is shown, never the counts in `summary` or the exit code; [Show less](/cli/reference/output#show-less) has the rules.
 
 The text output has one line per target, most urgent first, then the counts and how long the scan took:
 
@@ -87,10 +87,10 @@ Text taken from certificates and errors has its control characters removed befor
 | `NO_COLOR`       | Text without color                                                                         |
 | `TERM=dumb`      | Text without color and no spinner                                                          |
 | `EXPIRELY_AGENT` | `1` makes expirely behave as run by an agent; `0` turns agent detection off                |
-| `AI_AGENT`, `AGENT` and agent markers | Detected AI agents get no color and no spinner; declared ones get JSON. See [AI agents and CI](/agents) |
-| `GITHUB_ACTIONS=true` | In a GitHub Actions workflow, also writes a job summary to `GITHUB_STEP_SUMMARY` and an annotation per certificate that needs attention on stderr. See [Gate CI and alert from cron](/guides/ci#github-actions) |
+| `AI_AGENT`, `AGENT` and agent markers | Detected AI agents get no color and no spinner; declared ones get JSON. See [AI agents and CI](/cli/agents) |
+| `GITHUB_ACTIONS=true` | In a GitHub Actions workflow, also writes a job summary to `GITHUB_STEP_SUMMARY` and an annotation per certificate that needs attention on stderr. See [Gate CI and alert from cron](/cli/guides/ci#github-actions) |
 | `EXPIRELY_GITHUB` | `0` turns the job summary and annotations off |
 
 ## Exit codes
 
-Every exit code is computed over all results, whatever `--status`, `--fields` and `--limit` show. `0` when every target is `ok`, `1` when a certificate is `expired`, `revoked` or `expiring`, `2` for a usage error, `3` when a target could not be read or an end date is `unknown`, and `130` when Ctrl-C stopped the scan, which then prints no results. `1` wins over `3`. A second Ctrl-C ends expirely at once. Each code is in [Error codes](/reference/error-codes).
+Every exit code is computed over all results, whatever `--status`, `--fields` and `--limit` show. `0` when every target is `ok`, `1` when a certificate is `expired`, `revoked` or `expiring`, `2` for a usage error, `3` when a target could not be read or an end date is `unknown`, and `130` when Ctrl-C stopped the scan, which then prints no results. `1` wins over `3`. A second Ctrl-C ends expirely at once. Each code is in [Error codes](/cli/reference/error-codes).

@@ -63,4 +63,4 @@ esac
 expirely tls --json -f targets.txt | jq -r '.results[] | select(.status == "expiring" or .status == "expired") | "\(.target) \(.days_left)"'
 ```
 
-The fields are in [Output](/reference/output).
+The fields are in [Output](/cli/reference/output).

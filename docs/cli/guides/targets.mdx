@@ -9,7 +9,7 @@ description: Give expirely targets as arguments, from files or from another comm
 expirely tls example.com api.example.com:8443 https://intranet.example.com/login [2001:db8::1]:443
 ```
 
-A target is a host, `host:port`, `[ipv6]:port`, a bare IP address or an `https://` URL. The port defaults to `443`, and the path, query and fragment of a URL are ignored. expirely rejects these before it scans anything, with [`invalid_target`](/reference/error-codes):
+A target is a host, `host:port`, `[ipv6]:port`, a bare IP address or an `https://` URL. The port defaults to `443`, and the path, query and fragment of a URL are ignored. expirely rejects these before it scans anything, with [`invalid_target`](/cli/reference/error-codes):
 
 - a scheme other than `https://`, because it does not use TLS;
 - a username or password in a URL;
