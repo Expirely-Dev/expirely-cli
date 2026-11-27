@@ -25,7 +25,7 @@ expirely tls gcp --project acme-production
 
 ## Shared by every command
 
-Every command reports the same way: the same statuses, the same [JSON report](/reference/output), the same [error codes](/reference/error-codes), and the same exit codes: `0` when every certificate is `ok`, `1` when one is `expired` or `expiring`, `2` for a usage error, `3` when something could not be read and `130` when Ctrl-C stopped the run. `1` wins over `3`. The environment variables each command reads are in [expirely tls](/cli/tls#environment).
+Every command reports the same way: the same statuses, the same [JSON report](/reference/output), the same [error codes](/reference/error-codes), and the same exit codes: `0` when every certificate is `ok`, `1` when one is `expired` or `expiring`, `2` for a usage error, `3` when something could not be read or an end date is `unknown`, and `130` when Ctrl-C stopped the run. `1` wins over `3`. The environment variables each command reads are in [expirely tls](/cli/tls#environment).
 
 ## Commands that moved
 

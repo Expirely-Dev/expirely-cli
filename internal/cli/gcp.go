@@ -32,8 +32,8 @@ Scan
 
 Output
       --json              print JSON; the default when stdout is not a terminal
-      --status LIST       show only these statuses: expired, expiring, error, ok, all
-                          (default all; a declared agent gets expired,expiring,error)
+      --status LIST       show only these statuses: expired, expiring, error, unknown, ok, all
+                          (default all; a declared agent gets expired,expiring,error,unknown)
       --fields LIST       keep only these keys in each JSON result; target is always kept
       --limit N           show at most N results, most urgent first
   -h, --help              show this help
@@ -108,7 +108,7 @@ func gcpFindings(certs []gcp.Certificate, now time.Time, warn time.Duration) []s
 		if cert.NotAfter == nil {
 			continue
 		}
-		f := scan.Expiry(cert.Domain, *cert.NotAfter, now, warn)
+		f := scan.Expiry(scan.SourceGCP, cert.Domain, *cert.NotAfter, now, warn)
 		f.GCP = &scan.GCPInfo{Name: cert.Name, Location: cert.Location, Source: cert.Source, Managed: cert.Managed, InUseBy: orEmpty(cert.InUseBy)}
 		findings = append(findings, f)
 	}

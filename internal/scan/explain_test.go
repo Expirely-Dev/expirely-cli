@@ -119,10 +119,10 @@ func TestScanExplainsRealHandshakes(t *testing.T) {
 				t.Fatalf("Error = %+v, want a certificate", got.Error)
 			}
 			switch {
-			case tt.wantIssue == "" && got.TrustIssue != nil:
-				t.Errorf("TrustIssue = %q, want nil for a trusted chain", *got.TrustIssue)
-			case tt.wantIssue != "" && (got.TrustIssue == nil || *got.TrustIssue != tt.wantIssue):
-				t.Errorf("TrustIssue = %v, want %q", got.TrustIssue, tt.wantIssue)
+			case tt.wantIssue == "" && got.TLS.TrustIssue != nil:
+				t.Errorf("TrustIssue = %q, want nil for a trusted chain", *got.TLS.TrustIssue)
+			case tt.wantIssue != "" && (got.TLS.TrustIssue == nil || *got.TLS.TrustIssue != tt.wantIssue):
+				t.Errorf("TrustIssue = %v, want %q", got.TLS.TrustIssue, tt.wantIssue)
 			}
 		})
 	}

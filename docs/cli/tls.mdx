@@ -16,10 +16,10 @@ expirely tls -f targets.txt --concurrency 64 --timeout 3s
 | -------------------- | ------------------------------------------------------------------------------------------------- |
 | `--ca-file PATH`     | Also trust the CA certificates in this PEM file, on top of the system roots. Can be given more than once |
 | `--concurrency N`    | Targets scanned at once, `1` or more. Default `16`                                                |
-| `--details`          | Add every certificate of each chain to the JSON, as `chain`. Without it, each result keeps only the leaf |
+| `--details`          | Add every certificate of each chain to the JSON, as `tls.chain`. Without it, each result keeps only the leaf |
 | `--fields LIST`      | Keep only these keys in each JSON result, in the order the report prints them; `target` is always kept, and a key with no value is `null`. A comma list, or the flag repeated. Needs JSON output |
 | `--limit N`          | Show at most `N` results, `1` or more, most urgent first. No limit by default |
-| `--status LIST`      | Show only results with these statuses: `expired`, `expiring`, `error`, `ok`, or `all`. A comma list, or the flag repeated. Default `all`; a declared agent gets `expired,expiring,error` |
+| `--status LIST`      | Show only results with these statuses: `expired`, `expiring`, `error`, `unknown`, `ok`, or `all`. A comma list, or the flag repeated. Default `all`; a declared agent gets `expired,expiring,error,unknown` |
 | `-f`, `--file PATH`  | Read targets from `PATH`, one per line; `-` reads stdin. Can be given more than once              |
 | `-h`, `--help`       | Print the help as text and exit `0`                                                               |
 | `--json`             | Print JSON. Also the default when stdout is not a terminal                                        |
@@ -40,7 +40,7 @@ Each target gets one status:
 | `ok`       | It expires later than that                                 |
 | `error`    | The target could not be read                               |
 
-The status comes from the earliest `NotAfter` in the chain the server sends, so an intermediate that expires before the leaf is reported. Trust does not change the status: an untrusted chain far from expiry is `ok`, with `trusted` false.
+The status comes from the earliest `NotAfter` in the chain the server sends, so an intermediate that expires before the leaf is reported. Trust does not change the status: an untrusted chain far from expiry is `ok`, with `tls.trusted` false. A scan reads the end date of every chain it reaches, so it never reports `unknown`; that status comes from the cloud commands. All statuses are in [Output](/reference/output#status).
 
 ## Output
 
@@ -77,4 +77,4 @@ Text taken from certificates and errors has its control characters removed befor
 
 ## Exit codes
 
-Every exit code is computed over all results, whatever `--status`, `--fields` and `--limit` show. `0` when every target is `ok`, `1` when a certificate is `expired` or `expiring`, `2` for a usage error, `3` when a target could not be read and `130` when Ctrl-C stopped the scan, which then prints no results. `1` wins over `3`. A second Ctrl-C ends expirely at once. Each code is in [Error codes](/reference/error-codes).
+Every exit code is computed over all results, whatever `--status`, `--fields` and `--limit` show. `0` when every target is `ok`, `1` when a certificate is `expired` or `expiring`, `2` for a usage error, `3` when a target could not be read or an end date is `unknown`, and `130` when Ctrl-C stopped the scan, which then prints no results. `1` wins over `3`. A second Ctrl-C ends expirely at once. Each code is in [Error codes](/reference/error-codes).

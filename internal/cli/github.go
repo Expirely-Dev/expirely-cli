@@ -51,7 +51,8 @@ func appendFile(path, text string) error {
 	return f.Close()
 }
 
-// needsAttention reports whether f is expired, expiring or unreadable.
+// needsAttention reports whether f is expired, expiring, unreadable or of
+// unknown end date.
 func needsAttention(f scan.Finding) bool { return f.Status != scan.StatusOK }
 
 // githubSummary is the Markdown job summary of r: a table of every result
@@ -109,9 +110,9 @@ func githubSummary(r report, findings []scan.Finding) string {
 	if len(r.Unreadable) > 0 {
 		fmt.Fprintf(&b, "Could not read %s; certificates kept there are missing from this report.\n\n", markdownCell(strings.Join(r.Unreadable, ", ")))
 	}
-	fmt.Fprintf(&b, "Checked %d: %d ok, %d expiring, %d expired, %d unreadable. warn-days %d, expirely %s.\n",
+	fmt.Fprintf(&b, "Checked %d: %d ok, %d expiring, %d expired, %d unreadable, %d unknown. warn-days %d, expirely %s.\n",
 		r.Summary["total"], r.Summary[string(scan.StatusOK)], r.Summary[string(scan.StatusExpiring)],
-		r.Summary[string(scan.StatusExpired)], r.Summary[string(scan.StatusError)], r.WarnDays, version())
+		r.Summary[string(scan.StatusExpired)], r.Summary[string(scan.StatusError)], r.Summary[string(scan.StatusUnknown)], r.WarnDays, version())
 	return b.String()
 }
 
@@ -122,8 +123,8 @@ func detail(f scan.Finding) string {
 	switch {
 	case f.Error != nil:
 		return f.Error.Reason
-	case f.TrustIssue != nil && *f.TrustIssue != scan.TrustExpired:
-		return "not trusted: " + trustWords[*f.TrustIssue]
+	case f.TLS.TrustIssue != nil && *f.TLS.TrustIssue != scan.TrustExpired:
+		return "not trusted: " + trustWords[*f.TLS.TrustIssue]
 	case f.ACM != nil:
 		return "ACM " + f.ACM.Region + ", " + resourceCount(len(f.ACM.InUseBy))
 	case f.GCP != nil:
@@ -160,6 +161,8 @@ func writeAnnotations(w io.Writer, r report, findings []scan.Finding) {
 			kind, title, message = "warning", "Certificate expiring: "+target, target+" expires in "+when(f)+", on "+date(f)+"."
 		case scan.StatusError:
 			title, message = "Certificate not read: "+target, target+" could not be read: "+when(f)+"."
+		case scan.StatusUnknown:
+			title, message = "Certificate end date unknown: "+target, target+" has no end date to read."
 		}
 		if shown[kind] == maxAnnotations {
 			hidden++

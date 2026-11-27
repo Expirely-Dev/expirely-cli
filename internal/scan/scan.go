@@ -1,6 +1,6 @@
 // Package scan turns probe results into findings: for each target, whether
 // the certificate chain it serves is ok, expiring within a warning window,
-// expired, or could not be read.
+// expired, of unknown end date, or could not be read.
 package scan
 
 import (
@@ -22,7 +22,19 @@ const (
 	StatusExpired  Status = "expired"
 	StatusExpiring Status = "expiring"
 	StatusError    Status = "error"
+	StatusUnknown  Status = "unknown"
 	StatusOK       Status = "ok"
+)
+
+// KindTLSCertificate is the kind of every finding this package builds.
+const KindTLSCertificate = "tls_certificate"
+
+// Sources of a finding: where its certificate was read. They are part of
+// the public JSON contract.
+const (
+	SourceEndpoint = "endpoint"
+	SourceAWSACM   = "aws_acm"
+	SourceGCP      = "gcp"
 )
 
 // Codes of a Finding.Error. They are part of the public JSON contract.
@@ -57,9 +69,16 @@ var Remediations = map[string]string{
 	CodeHandshakeFailed: "The port accepted a connection but did not complete TLS; it may serve plain HTTP, need another port or reject this client; reason says which.",
 }
 
-// Finding is the result for one target. When Status is StatusError, Error
-// is set and every certificate field is nil; otherwise Error is nil.
+// Finding is the result for one resource. Kind, Source, Target, Status,
+// DaysLeft, ExpiresAt and Error are common to every kind of resource; TLS
+// holds what only a TLS certificate has, and ACM and GCP what a cloud
+// provider says about it. When Status is StatusError, Error is set and the
+// expiry and TLS fields are nil; otherwise Error is nil. When Status is
+// StatusUnknown, the resource exists but its end date could not be read, so
+// DaysLeft and ExpiresAt are nil.
 type Finding struct {
+	Kind   string `json:"kind"`
+	Source string `json:"source"`
 	Target string `json:"target"`
 	Status Status `json:"status"`
 	// DaysLeft counts whole days until the first certificate in the chain
@@ -67,23 +86,30 @@ type Finding struct {
 	DaysLeft *int `json:"days_left"`
 	// ExpiresAt is when the first certificate in the chain expires, which
 	// may be an intermediate rather than the leaf.
-	ExpiresAt *time.Time `json:"expires_at"`
-	Trusted   *bool      `json:"trusted"`
+	ExpiresAt *time.Time    `json:"expires_at"`
+	Error     *FindingError `json:"error"`
+	TLS       TLSInfo       `json:"tls"`
+	// ACM describes a certificate read from AWS Certificate Manager rather
+	// than from a handshake; it is absent for other sources.
+	ACM *ACMInfo `json:"acm,omitempty"`
+	// GCP describes a certificate read from a Google Cloud project; it is
+	// absent for other sources.
+	GCP *GCPInfo `json:"gcp,omitempty"`
+}
+
+// TLSInfo is what a handshake reveals about a certificate chain. Every field
+// is nil when the chain was not read, as on error or for a certificate a
+// cloud provider lists.
+type TLSInfo struct {
+	Trusted *bool `json:"trusted"`
 	// TrustIssue names why the chain does not verify, one of the Trust
-	// constants; it is nil when the chain verifies or on error.
+	// constants; it is nil when the chain verifies or was not read.
 	TrustIssue  *string `json:"trust_issue"`
 	VerifyError *string `json:"verify_error"`
 	Leaf        *Cert   `json:"leaf"`
 	// Chain is every certificate the server sent, leaf first. Reports
 	// leave it out unless asked for, since it is most of their size.
-	Chain []Cert        `json:"chain,omitempty"`
-	Error *FindingError `json:"error"`
-	// ACM describes a certificate read from AWS Certificate Manager rather
-	// than from a handshake; it is absent for scanned targets.
-	ACM *ACMInfo `json:"acm,omitempty"`
-	// GCP describes a certificate read from a Google Cloud project; it is
-	// absent for scanned targets.
-	GCP *GCPInfo `json:"gcp,omitempty"`
+	Chain []Cert `json:"chain,omitempty"`
 }
 
 // GCPInfo is what Google Cloud says about one of a project's
@@ -176,10 +202,10 @@ func scanOne(ctx context.Context, p Prober, t target.Target, opts Options) Findi
 }
 
 // Expiry returns the finding for a certificate known by its end date
-// alone, as a cloud provider lists it: notAfter decides the status, expired
-// when it is not after now, expiring when it is within warn of now, ok
-// otherwise. The trust, leaf and chain fields stay nil.
-func Expiry(target string, notAfter, now time.Time, warn time.Duration) Finding {
+// alone, as a cloud provider lists it, read from source: notAfter decides
+// the status, expired when it is not after now, expiring when it is within
+// warn of now, ok otherwise. The TLS fields stay nil.
+func Expiry(source, target string, notAfter, now time.Time, warn time.Duration) Finding {
 	status := StatusOK
 	switch {
 	case !notAfter.After(now):
@@ -189,7 +215,7 @@ func Expiry(target string, notAfter, now time.Time, warn time.Duration) Finding 
 	}
 	days := daysLeft(notAfter.Sub(now))
 	expires := notAfter.UTC()
-	return Finding{Target: target, Status: status, DaysLeft: &days, ExpiresAt: &expires}
+	return Finding{Kind: KindTLSCertificate, Source: source, Target: target, Status: status, DaysLeft: &days, ExpiresAt: &expires}
 }
 
 // Classify computes the finding for a probe result at now. The chain's
@@ -212,15 +238,15 @@ func Classify(r probe.Result, now time.Time, warn time.Duration) Finding {
 		}
 	}
 
-	f := Expiry(r.Target.String(), earliest, now, warn)
+	f := Expiry(SourceEndpoint, r.Target.String(), earliest, now, warn)
 	trusted := r.VerifyError == nil
-	f.Trusted = &trusted
+	f.TLS.Trusted = &trusted
 	if r.VerifyError != nil {
 		msg := r.VerifyError.Error()
 		issue := trustIssue(r.VerifyError, r.Chain[0])
-		f.VerifyError, f.TrustIssue = &msg, &issue
+		f.TLS.VerifyError, f.TLS.TrustIssue = &msg, &issue
 	}
-	f.Leaf, f.Chain = &chain[0], chain
+	f.TLS.Leaf, f.TLS.Chain = &chain[0], chain
 	return f
 }
 
@@ -239,6 +265,8 @@ func errorFinding(t target.Target, err error) Finding {
 		code = CodeDialFailed
 	}
 	return Finding{
+		Kind:   KindTLSCertificate,
+		Source: SourceEndpoint,
 		Target: t.String(),
 		Status: StatusError,
 		Error:  &FindingError{Code: code, Reason: reason(err), Message: err.Error(), Remediation: Remediations[code]},

@@ -63,7 +63,7 @@ func (r report) MarshalJSON() ([]byte, error) {
 
 // schemaVersion is the version of the JSON report. It changes when a field
 // is removed or changes meaning; adding a field keeps it.
-const schemaVersion = 1
+const schemaVersion = 2
 
 // newReport builds the report for findings as v shows them: sorted most
 // urgent first, the statuses v shows, at most v.limit of them, and without
@@ -88,7 +88,7 @@ func newReport(now time.Time, warnDays int, findings []scan.Finding, v *view) re
 	for _, f := range byUrgency(findings) {
 		if slices.Contains(statuses, f.Status) {
 			if !v.details {
-				f.Chain = nil
+				f.TLS.Chain = nil
 			}
 			shown = append(shown, f)
 		}
@@ -243,7 +243,7 @@ func paint(st ui.Style, s scan.Status, text string) string {
 	switch s {
 	case scan.StatusExpired, scan.StatusError:
 		return st.Bad(text)
-	case scan.StatusExpiring:
+	case scan.StatusExpiring, scan.StatusUnknown:
 		return st.Soon(text)
 	default:
 		return st.Good(text)
@@ -258,10 +258,14 @@ func days(f scan.Finding) int {
 }
 
 // when says how long a certificate has left, or how long ago it expired,
-// in whole days; for a target that could not be read it gives the reason.
+// in whole days; for a target that could not be read it gives the reason,
+// and for an end date that could not be read it says unknown.
 func when(f scan.Finding) string {
 	if f.Error != nil {
 		return ui.Clean(f.Error.Reason)
+	}
+	if f.DaysLeft == nil {
+		return "unknown"
 	}
 	d := days(f)
 	if f.Status == scan.StatusExpired {
@@ -304,10 +308,10 @@ func note(f scan.Finding) (text string, warn bool) {
 		}
 		return usageNote("self-managed", len(f.GCP.InUseBy))
 	}
-	if f.TrustIssue == nil {
+	if f.TLS.TrustIssue == nil {
 		return "", false
 	}
-	return trustWords[*f.TrustIssue], true
+	return trustWords[*f.TLS.TrustIssue], true
 }
 
 // acmNote says whether ACM renews a certificate and, when it does not, how

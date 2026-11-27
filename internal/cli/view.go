@@ -13,17 +13,17 @@ import (
 
 // statusOrder lists the statuses from most to least urgent; results are
 // sorted, filtered and counted in this order.
-var statusOrder = []scan.Status{scan.StatusExpired, scan.StatusExpiring, scan.StatusError, scan.StatusOK}
+var statusOrder = []scan.Status{scan.StatusExpired, scan.StatusExpiring, scan.StatusError, scan.StatusUnknown, scan.StatusOK}
 
 // agentStatuses is what a declared agent sees when it passes no --status:
 // everything that needs attention, and none of the ok results, which the
 // summary still counts.
-var agentStatuses = []scan.Status{scan.StatusExpired, scan.StatusExpiring, scan.StatusError}
+var agentStatuses = []scan.Status{scan.StatusExpired, scan.StatusExpiring, scan.StatusError, scan.StatusUnknown}
 
 // resultFields are the keys of a result, in the order the JSON prints
 // them; --fields accepts these names. A test keeps them equal to the JSON
 // tags of scan.Finding.
-var resultFields = []string{"target", "status", "days_left", "expires_at", "trusted", "trust_issue", "verify_error", "leaf", "chain", "error", "acm", "gcp"}
+var resultFields = []string{"kind", "source", "target", "status", "days_left", "expires_at", "error", "tls", "acm", "gcp"}
 
 // listFlag collects a flag given as a comma-separated list, repeated, or
 // both; empty items are dropped.
@@ -82,7 +82,7 @@ func (v *view) resolve(c *command, fs *flag.FlagSet) *Error {
 		}
 		s := scan.Status(name)
 		if !slices.Contains(statusOrder, s) {
-			return failf(CodeInvalidFlag, "unknown status %q in --status; valid: expired, expiring, error, ok, all", name)
+			return failf(CodeInvalidFlag, "unknown status %q in --status; valid: expired, expiring, error, unknown, ok, all", name)
 		}
 		if !slices.Contains(v.statuses, s) {
 			v.statuses = append(v.statuses, s)
@@ -111,9 +111,6 @@ func (v *view) resolve(c *command, fs *flag.FlagSet) *Error {
 			if f != "target" && slices.Contains(v.fieldsFlag, f) {
 				v.fields = append(v.fields, f)
 			}
-		}
-		if slices.Contains(v.fields, "chain") {
-			v.details = true
 		}
 	}
 	return nil

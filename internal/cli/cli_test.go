@@ -166,9 +166,13 @@ type scanReport struct {
 		Target   string `json:"target"`
 		Status   string `json:"status"`
 		DaysLeft *int   `json:"days_left"`
-		Trusted  *bool  `json:"trusted"`
-		Leaf     *any   `json:"leaf"`
-		Error    *struct {
+		Kind     string `json:"kind"`
+		Source   string `json:"source"`
+		TLS      struct {
+			Trusted *bool `json:"trusted"`
+			Leaf    *any  `json:"leaf"`
+		} `json:"tls"`
+		Error *struct {
 			Code string `json:"code"`
 		} `json:"error"`
 	} `json:"results"`
@@ -228,8 +232,11 @@ func TestRunScanJSON(t *testing.T) {
 				if r.Status != tt.wantStatus[i] {
 					t.Errorf("results[%d].status = %q, want %q", i, r.Status, tt.wantStatus[i])
 				}
+				if r.Kind != "tls_certificate" || r.Source != "endpoint" {
+					t.Errorf("results[%d] kind = %q, source = %q, want tls_certificate and endpoint", i, r.Kind, r.Source)
+				}
 				if r.Status == "error" {
-					if r.DaysLeft != nil || r.Trusted != nil || r.Leaf != nil {
+					if r.DaysLeft != nil || r.TLS.Trusted != nil || r.TLS.Leaf != nil {
 						t.Errorf("results[%d] error has certificate fields, want null", i)
 					}
 					if r.Error == nil || r.Error.Code != "dial_failed" {
@@ -240,8 +247,8 @@ func TestRunScanJSON(t *testing.T) {
 				if r.DaysLeft == nil || *r.DaysLeft != tt.wantDays[i] {
 					t.Errorf("results[%d].days_left = %v, want %d", i, r.DaysLeft, tt.wantDays[i])
 				}
-				if r.Trusted == nil || *r.Trusted {
-					t.Errorf("results[%d].trusted = %v, want false for a test CA", i, r.Trusted)
+				if r.TLS.Trusted == nil || *r.TLS.Trusted {
+					t.Errorf("results[%d].tls.trusted = %v, want false for a test CA", i, r.TLS.Trusted)
 				}
 			}
 			if got.Summary[tt.wantStatus[0]] == 0 {

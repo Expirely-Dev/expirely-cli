@@ -18,7 +18,7 @@ expirely tls gcp --project acme-production --json | jq '.results[] | select(.gcp
 | `--timeout DURATION` | Time allowed to read the project, such as `1m`. Default `30s`                                |
 | `--fields LIST`      | Keep only these keys in each JSON result, in the order the report prints them; `target` is always kept, and a key with no value is `null`. A comma list, or the flag repeated. Needs JSON output |
 | `--limit N`          | Show at most `N` results, `1` or more, most urgent first. No limit by default |
-| `--status LIST`      | Show only results with these statuses: `expired`, `expiring`, `error`, `ok`, or `all`. A comma list, or the flag repeated. Default `all`; a declared agent gets `expired,expiring,error` |
+| `--status LIST`      | Show only results with these statuses: `expired`, `expiring`, `error`, `unknown`, `ok`, or `all`. A comma list, or the flag repeated. Default `all`; a declared agent gets `expired,expiring,error,unknown` |
 | `--json`             | Print JSON. Also the default when stdout is not a terminal                                   |
 | `-h`, `--help`       | Print the help as text and exit `0`                                                          |
 
@@ -64,7 +64,7 @@ A project with the Certificate Manager API disabled has no certificates there, s
 
 ## Output
 
-The JSON report is the one in [Output](/reference/output). Each result has a `gcp` object and no trust fields, since Google Cloud does not verify the chain for a host:
+The JSON report is the one in [Output](/reference/output). Each result has `source` `gcp`, a `gcp` object, and a `tls` object whose fields are `null`, since Google Cloud does not verify the chain for a host:
 
 | Field           | Meaning                                                                               |
 | --------------- | ------------------------------------------------------------------------------------- |
