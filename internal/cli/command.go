@@ -85,6 +85,20 @@ func parseInterspersed(fs *flag.FlagSet, args []string) ([]string, error) {
 	}
 }
 
+// noArguments ends a command that takes flags alone when rest holds
+// anything: the word help prints the help, and any other argument is an
+// error that names it.
+func (c *command) noArguments(name string, rest []string) (code int, done bool) {
+	switch {
+	case len(rest) == 0:
+		return ExitOK, false
+	case len(rest) == 1 && rest[0] == "help":
+		fmt.Fprint(c.Stdout, c.help)
+		return ExitOK, true
+	}
+	return c.fail(failf(CodeUnexpectedArgument, "%s takes flags only, got %q", name, rest[0])), true
+}
+
 // fail prints e and returns its exit code. In JSON it prints the envelope;
 // in text it prints the message and, on the next line, what resolves it.
 // A usage error read by an agent also gets the whole help, since an agent
@@ -209,7 +223,7 @@ func exitCode(findings []scan.Finding) int {
 	code := ExitOK
 	for _, f := range findings {
 		switch f.Status {
-		case scan.StatusExpired, scan.StatusExpiring:
+		case scan.StatusExpired, scan.StatusRevoked, scan.StatusExpiring:
 			return ExitFindings
 		case scan.StatusError, scan.StatusUnknown:
 			code = ExitFailure

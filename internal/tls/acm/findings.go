@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/service/acm/types"
 	"github.com/expirely-dev/expirely-cli/internal/tls/scan"
 )
 
@@ -58,13 +59,21 @@ admit:
 
 // Findings turns the certificates of region into findings. A certificate that was
 // never issued, such as one pending validation, has no end date and is
-// unknown; acm.status says why.
+// unknown; acm.status says why. One ACM revoked is revoked unless it already
+// expired.
 func Findings(certs []Certificate, region string, now time.Time, warn time.Duration) []scan.Finding {
 	findings := make([]scan.Finding, 0, len(certs))
 	for _, cert := range certs {
 		f := scan.Unknown(scan.SourceAWSACM, cert.Domain)
 		if cert.NotAfter != nil {
 			f = scan.Expiry(scan.SourceAWSACM, cert.Domain, *cert.NotAfter, now, warn)
+		}
+		if cert.Status == string(types.CertificateStatusRevoked) && f.Status != scan.StatusExpired {
+			f.Status = scan.StatusRevoked
+		}
+		var renewal *string
+		if cert.RenewalStatus != "" {
+			renewal = &cert.RenewalStatus
 		}
 		f.ACM = &scan.ACMInfo{
 			ARN:                cert.ARN,
@@ -73,6 +82,7 @@ func Findings(certs []Certificate, region string, now time.Time, warn time.Durat
 			Imported:           cert.Imported(),
 			Status:             cert.Status,
 			RenewalEligibility: cert.RenewalEligibility,
+			RenewalStatus:      renewal,
 			InUseBy:            orEmpty(cert.InUseBy),
 		}
 		findings = append(findings, f)

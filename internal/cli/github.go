@@ -51,9 +51,9 @@ func appendFile(path, text string) error {
 	return f.Close()
 }
 
-// needsAttention reports whether f is expired, expiring, unreadable, of
-// unknown end date, or revoked.
-func needsAttention(f scan.Finding) bool { return f.Status != scan.StatusOK || revoked(f) }
+// needsAttention reports whether f is expired, revoked, expiring,
+// unreadable or of unknown end date.
+func needsAttention(f scan.Finding) bool { return f.Status != scan.StatusOK }
 
 // githubSummary is the Markdown job summary of r: a table of every result
 // that needs attention, most urgent first, or one line naming the
@@ -110,9 +110,9 @@ func githubSummary(r report, findings []scan.Finding) string {
 	if len(r.Unreadable) > 0 {
 		fmt.Fprintf(&b, "Could not read %s; certificates kept there are missing from this report.\n\n", markdownCell(strings.Join(r.Unreadable, ", ")))
 	}
-	fmt.Fprintf(&b, "Checked %d: %d ok, %d expiring, %d expired, %d unreadable, %d unknown. warn-days %d, expirely %s.\n",
+	fmt.Fprintf(&b, "Checked %d: %d ok, %d expiring, %d expired, %d revoked, %d unreadable, %d unknown. warn-days %d, expirely %s.\n",
 		r.Summary["total"], r.Summary[string(scan.StatusOK)], r.Summary[string(scan.StatusExpiring)],
-		r.Summary[string(scan.StatusExpired)], r.Summary[string(scan.StatusError)], r.Summary[string(scan.StatusUnknown)], r.WarnDays, version())
+		r.Summary[string(scan.StatusExpired)], r.Summary[string(scan.StatusRevoked)], r.Summary[string(scan.StatusError)], r.Summary[string(scan.StatusUnknown)], r.WarnDays, version())
 	return b.String()
 }
 
@@ -123,8 +123,6 @@ func detail(f scan.Finding) string {
 	switch {
 	case f.Error != nil:
 		return f.Error.Reason
-	case revoked(f):
-		return "revoked"
 	case f.Status == scan.StatusUnknown && providerState(f) != "":
 		return "no end date: " + providerState(f)
 	case f.TLS.TrustIssue != nil && *f.TLS.TrustIssue != scan.TrustExpired:
@@ -167,8 +165,8 @@ func writeAnnotations(w io.Writer, r report, findings []scan.Finding) {
 			title, message = "Certificate not read: "+target, target+" could not be read: "+when(f)+"."
 		case scan.StatusUnknown:
 			title, message = "Certificate end date unknown: "+target, target+" has no end date to read."
-		case scan.StatusOK:
-			title, message = "Certificate revoked: "+target, target+" is revoked by its CA; it expires in "+when(f)+", on "+date(f)+"."
+		case scan.StatusRevoked:
+			title, message = "Certificate revoked: "+target, target+" is revoked; it would expire in "+when(f)+", on "+date(f)+"."
 		}
 		if shown[kind] == maxAnnotations {
 			hidden++

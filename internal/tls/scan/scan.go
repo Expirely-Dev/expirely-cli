@@ -22,6 +22,7 @@ type Status string
 // Statuses, from most to least urgent.
 const (
 	StatusExpired  Status = "expired"
+	StatusRevoked  Status = "revoked"
 	StatusExpiring Status = "expiring"
 	StatusError    Status = "error"
 	StatusUnknown  Status = "unknown"
@@ -77,7 +78,9 @@ var Remediations = map[string]string{
 // provider says about it. When Status is StatusError, Error is set and the
 // expiry and TLS fields are nil; otherwise Error is nil. When Status is
 // StatusUnknown, the resource exists but its end date could not be read, so
-// DaysLeft and ExpiresAt are nil.
+// DaysLeft and ExpiresAt are nil. When Status is StatusRevoked, the
+// resource is not expired but its CA or provider revoked it; DaysLeft and
+// ExpiresAt still give its end date.
 type Finding struct {
 	Kind   string `json:"kind"`
 	Source string `json:"source"`
@@ -136,13 +139,17 @@ type GCPInfo struct {
 // region that holds it. Imported is true for a certificate ACM never
 // renews.
 type ACMInfo struct {
-	ARN                string   `json:"arn"`
-	Region             string   `json:"region"`
-	Type               string   `json:"type"`
-	Imported           bool     `json:"imported"`
-	Status             string   `json:"status"`
-	RenewalEligibility string   `json:"renewal_eligibility"`
-	InUseBy            []string `json:"in_use_by"`
+	ARN                string `json:"arn"`
+	Region             string `json:"region"`
+	Type               string `json:"type"`
+	Imported           bool   `json:"imported"`
+	Status             string `json:"status"`
+	RenewalEligibility string `json:"renewal_eligibility"`
+	// RenewalStatus is the state of ACM's managed renewal, such as
+	// PENDING_AUTO_RENEWAL, PENDING_VALIDATION, SUCCESS or FAILED; it is
+	// nil when ACM has started none.
+	RenewalStatus *string  `json:"renewal_status"`
+	InUseBy       []string `json:"in_use_by"`
 }
 
 // Revocation is what a CRL says about a leaf. Status is one of the
@@ -226,16 +233,28 @@ func scanOne(ctx context.Context, p Prober, t target.Target, opts Options) Findi
 	}
 	f := Classify(r, opts.Now, opts.Warn)
 	if opts.Revocation != nil {
-		checkCtx, cancel := context.WithTimeout(ctx, opts.Timeout)
-		defer cancel()
-		res := opts.Revocation.Check(checkCtx, r.Chain[0], issuerOf(r.Chain))
+		res := revocation.Result{Status: revocation.StatusUnknown, Reason: untrustedChain}
+		if r.VerifyError == nil {
+			checkCtx, cancel := context.WithTimeout(ctx, opts.Timeout)
+			defer cancel()
+			res = opts.Revocation.Check(checkCtx, r.Chain[0], issuerOf(r.Chain))
+		}
 		f.TLS.Revocation = &Revocation{Status: res.Status}
 		if res.Reason != "" {
 			f.TLS.Revocation.Reason = &res.Reason
 		}
+		if res.Status == revocation.StatusRevoked && f.Status != StatusExpired {
+			f.Status = StatusRevoked
+		}
 	}
 	return f
 }
+
+// untrustedChain is why revocation is unknown for a chain that does not
+// verify: the CRL URL in such a certificate was written by whoever serves
+// it, so fetching it would let a scanned host choose where expirely
+// connects.
+const untrustedChain = "the chain is not trusted, so the CRL its certificate names was not fetched"
 
 // issuerOf returns the certificate in chain that signed its leaf, or nil
 // when the server did not send it.

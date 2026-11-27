@@ -34,8 +34,11 @@ type Certificate struct {
 	Type               string
 	Status             string
 	RenewalEligibility string
-	NotAfter           *time.Time
-	InUseBy            []string
+	// RenewalStatus is the state of ACM's managed renewal, empty when ACM
+	// has started none.
+	RenewalStatus string
+	NotAfter      *time.Time
+	InUseBy       []string
 }
 
 // Imported reports whether the certificate was imported into ACM. ACM never
@@ -75,7 +78,7 @@ func List(ctx context.Context, api API) ([]Certificate, error) {
 	return certs, nil
 }
 
-// describe fills in InUseBy for every certificate, describeConcurrency at a
+// describe fills in InUseBy and RenewalStatus for every certificate, describeConcurrency at a
 // time. The first failure stops the calls not yet made, and is the error
 // describe returns.
 func describe(ctx context.Context, api API, certs []Certificate) error {
@@ -102,6 +105,9 @@ admit:
 			}
 			if out.Certificate != nil {
 				certs[i].InUseBy = out.Certificate.InUseBy
+				if r := out.Certificate.RenewalSummary; r != nil {
+					certs[i].RenewalStatus = string(r.RenewalStatus)
+				}
 			}
 		})
 	}

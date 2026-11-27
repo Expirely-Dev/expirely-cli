@@ -2,7 +2,7 @@
   "$schema": "https://mintlify.com/docs.json",
   "theme": "almond",
   "name": "expirely CLI",
-  "description": "Find every TLS certificate you serve and when it expires.",
+  "description": "Know what expires next, before it breaks anything: the TLS certificates of your endpoints, AWS and Google Cloud.",
   "colors": {
     "primary": "#C2410C",
     "light": "#FB923C",

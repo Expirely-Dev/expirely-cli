@@ -47,7 +47,11 @@ func (f *fakeACM) DescribeCertificate(_ context.Context, in *sdk.DescribeCertifi
 			return nil, err
 		}
 	}
-	return &sdk.DescribeCertificateOutput{Certificate: &types.CertificateDetail{InUseBy: f.inUseBy[arn]}}, nil
+	detail := &types.CertificateDetail{InUseBy: f.inUseBy[arn]}
+	if arn == "arn:2" {
+		detail.RenewalSummary = &types.RenewalSummary{RenewalStatus: types.RenewalStatusFailed}
+	}
+	return &sdk.DescribeCertificateOutput{Certificate: detail}, nil
 }
 
 func summary(arn, domain string, typ types.CertificateType, notAfter *time.Time) types.CertificateSummary {
@@ -77,6 +81,9 @@ func TestListReadsEveryPageAndKeyType(t *testing.T) {
 
 	if len(got) != 3 {
 		t.Fatalf("len(certificates) = %d, want 3 across both pages", len(got))
+	}
+	if got[0].RenewalStatus != "" || got[1].RenewalStatus != "FAILED" {
+		t.Errorf("renewal statuses = %q and %q, want none for arn:1 and FAILED for arn:2", got[0].RenewalStatus, got[1].RenewalStatus)
 	}
 	if got[0].Domain != "api.example.com" || !got[0].Imported() || len(got[0].InUseBy) != 2 {
 		t.Errorf("certificates[0] = %+v, want the imported certificate used by two load balancers", got[0])

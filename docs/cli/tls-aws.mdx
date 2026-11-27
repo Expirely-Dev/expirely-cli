@@ -20,7 +20,7 @@ expirely tls aws --json | jq '.results[] | select(.acm.imported and .status != "
 | `--timeout DURATION` | Time allowed to read ACM, such as `1m`. Default `30s`                                            |
 | `--fields LIST`      | Keep only these keys in each JSON result, in the order the report prints them; `target` is always kept, and a key with no value is `null`. A comma list, or the flag repeated. Needs JSON output |
 | `--limit N`          | Show at most `N` results, `1` or more, most urgent first. No limit by default |
-| `--status LIST`      | Show only results with these statuses: `expired`, `expiring`, `error`, `unknown`, `ok`, or `all`. A comma list, or the flag repeated. Default `all`; a declared agent gets `expired,expiring,error,unknown` |
+| `--status LIST`      | Show only results with these statuses: `expired`, `revoked`, `expiring`, `error`, `unknown`, `ok`, or `all`. A comma list, or the flag repeated. Default `all`; a declared agent gets every status but `ok` |
 | `--json`             | Print JSON. Also the default when stdout is not a terminal                                       |
 | `-h`, `--help`       | Print the help as text and exit `0`                                                              |
 
@@ -34,12 +34,15 @@ ACM renews the certificates it issues while they are eligible. It never renews a
   ok        legacy.example.internal  203 days  Jun 17 2027  imported, not in use
 ```
 
-- `renews itself`: ACM issued it and will renew it.
+- `renews itself`: ACM issued it and renews it.
+- `renewal failed` or `renewal waits for validation`: ACM renews it, but the renewal under way is not completing, so it expires unless someone acts. `acm.renewal_status` has ACM's value.
 - `imported, in use by N resources`: ACM will not renew it, and a load balancer, CloudFront distribution or API stage serves it.
 - `does not renew, in use by N resources`: ACM issued it but reports it is not eligible for renewal, and something still serves it.
 - `imported, not in use` or `does not renew, not in use`: nothing serves it, so its expiry breaks nothing; it can be deleted.
 
 Notes about a certificate in use are highlighted, and within the same status a certificate in use is listed before one that nothing uses: an expired certificate still in use is a likely outage, while an expired one nothing uses is clean-up.
+
+A certificate ACM reports as `REVOKED` gets the status `revoked` unless it already expired, and makes the run exit `1`.
 
 A certificate that was never issued, such as one pending validation, has no end date. It is reported as `unknown`, with ACM's status as its note, such as `pending validation`, `failed` or `validation timed out`, and makes the run exit `3`. A request that will not be completed is deleted in ACM, which removes it from the report.
 
@@ -74,10 +77,11 @@ The JSON report is the one in [Output](/reference/output). Each result has `sour
 | `acm.imported`            | `true` for a certificate ACM never renews                            |
 | `acm.status`              | ACM's status, such as `ISSUED`, `EXPIRED` or `PENDING_VALIDATION`    |
 | `acm.renewal_eligibility` | `ELIGIBLE` or `INELIGIBLE`                                           |
+| `acm.renewal_status`      | The state of ACM's managed renewal: `PENDING_AUTO_RENEWAL`, `PENDING_VALIDATION`, `SUCCESS` or `FAILED`; `null` when ACM has started none |
 | `acm.in_use_by`           | ARNs of the resources that use it; empty when none do                |
 
 While ACM is read for longer than 150 ms, stderr shows `Reading ACM in REGION` and erases that line before the results print. Like the scan spinner, it appears only when stderr is a terminal and no AI agent is detected.
 
 ## Exit codes
 
-The same as a scan: `0` when every certificate is `ok`, `1` when one is `expired` or `expiring`. A certificate with an `unknown` end date exits `3` unless another exits `1`. A missing region or profile exits `2` with `aws_not_configured`; refused credentials or missing permissions exit `3` with `aws_access_denied`, and any other AWS failure exits `3` with `aws_request_failed`. With several regions, a region that fails does not fail the run: expirely reports the certificates it read, names that region in `unreadable` as `acm:REGION` (on stderr in text), and exits `3` unless a certificate it read exits `1`. Only when no region can be read does the run fail with the error of the first one. Each code is in [Error codes](/reference/error-codes).
+The same as a scan: `0` when every certificate is `ok`, `1` when one is `expired`, `revoked` or `expiring`. A certificate with an `unknown` end date exits `3` unless another exits `1`. A missing region or profile exits `2` with `aws_not_configured`; refused credentials or missing permissions exit `3` with `aws_access_denied`, and any other AWS failure exits `3` with `aws_request_failed`. With several regions, a region that fails does not fail the run: expirely reports the certificates it read, names that region in `unreadable` as `acm:REGION` (on stderr in text), and exits `3` unless a certificate it read exits `1`. Only when no region can be read does the run fail with the error of the first one. Each code is in [Error codes](/reference/error-codes).

@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/expirely-dev/expirely-cli/internal/tls/revocation"
 	"github.com/expirely-dev/expirely-cli/internal/tls/scan"
 	"github.com/expirely-dev/expirely-cli/internal/ui"
 )
@@ -242,7 +241,7 @@ func statusWord(s scan.Status) string {
 
 func paint(st ui.Style, s scan.Status, text string) string {
 	switch s {
-	case scan.StatusExpired, scan.StatusError:
+	case scan.StatusExpired, scan.StatusRevoked, scan.StatusError:
 		return st.Bad(text)
 	case scan.StatusExpiring, scan.StatusUnknown:
 		return st.Soon(text)
@@ -307,23 +306,18 @@ func note(f scan.Finding) (text string, warn bool) {
 		return acmNote(f.ACM)
 	}
 	if f.GCP != nil {
+		if f.GCP.Managed && f.GCP.State != nil && *f.GCP.State != "ACTIVE" {
+			return providerState(f), true
+		}
 		if f.GCP.Managed {
 			return "renews itself", false
 		}
 		return usageNote("self-managed", len(f.GCP.InUseBy))
 	}
-	if revoked(f) {
-		return "revoked", true
-	}
 	if f.TLS.TrustIssue == nil {
 		return "", false
 	}
 	return trustWords[*f.TLS.TrustIssue], true
-}
-
-// revoked reports whether a revocation check found f's leaf revoked.
-func revoked(f scan.Finding) bool {
-	return f.TLS.Revocation != nil && f.TLS.Revocation.Status == revocation.StatusRevoked
 }
 
 // providerState is the provider's own state of a certificate, in words, such
@@ -340,14 +334,18 @@ func providerState(f scan.Finding) string {
 	return ui.Clean(strings.ToLower(strings.ReplaceAll(state, "_", " ")))
 }
 
-// acmNote says whether ACM renews a certificate and, when it does not, how
-// many resources use it: a certificate nothing uses can only be cleaned up,
+// acmNote says whether ACM renews a certificate and, when it does not or
+// its renewal is failing, how many resources use it: a certificate nothing uses can only be cleaned up,
 // while one in use is what breaks when it expires, so only that one warns.
 func acmNote(a *scan.ACMInfo) (string, bool) {
 	var renewal string
 	switch {
 	case a.Imported:
 		renewal = "imported"
+	case a.RenewalStatus != nil && *a.RenewalStatus == "FAILED":
+		return usageNote("renewal failed", len(a.InUseBy))
+	case a.RenewalStatus != nil && *a.RenewalStatus == "PENDING_VALIDATION":
+		return usageNote("renewal waits for validation", len(a.InUseBy))
 	case a.RenewalEligibility == "ELIGIBLE":
 		return "renews itself", false
 	default:
