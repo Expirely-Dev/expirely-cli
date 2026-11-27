@@ -2,15 +2,16 @@
 
 Know which certificate expires next, before your users do.
 
-By 2029 a public TLS certificate lives 47 days at most (CA/Browser Forum ballot SC-081), and the ones renewed by hand are the ones that break. expirely checks your hosts and AWS accounts and tells you what expires, when, and what still serves it.
+By 2029 a public TLS certificate lives 47 days at most (CA/Browser Forum ballot SC-081), and the ones renewed by hand are the ones that break. expirely checks your hosts, AWS accounts and Google Cloud projects and tells you what expires, when, and what still serves it.
 
 ```sh
 expirely example.com api.example.com:8443
 expirely -f hosts.txt
 expirely aws --profile production
+expirely gcp --project production
 ```
 
-It only reads: a TLS handshake, or two read-only ACM calls. Exit code `1` means something needs renewing, so the same command gates CI, alerts from cron and gives AI agents JSON.
+It only reads: a TLS handshake, or a few list calls to AWS or Google Cloud. Exit code `1` means something needs renewing, so the same command gates CI, alerts from cron and gives AI agents JSON.
 
 ## Install
 

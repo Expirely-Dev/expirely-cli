@@ -1,0 +1,69 @@
+---
+title: expirely gcp
+description: List the SSL certificates of a Google Cloud project and when they expire.
+---
+
+`expirely gcp` reads every Compute Engine SSL certificate of one Google Cloud project, global and regional, which the external and internal Application Load Balancers and proxy Network Load Balancers serve. It reports each one the way a scan reports a target, and counts the target HTTPS and SSL proxies that serve it. It only lists and changes nothing.
+
+```sh
+expirely gcp --project acme-production
+GOOGLE_CLOUD_PROJECT=acme-production expirely gcp --warn-days 21
+expirely gcp --project acme-production --json | jq '.results[] | select(.gcp.managed | not)'
+```
+
+| Flag                 | Description                                                                                 |
+| -------------------- | ------------------------------------------------------------------------------------------- |
+| `--project ID`       | Project to read. Default `GOOGLE_CLOUD_PROJECT`, then `CLOUDSDK_CORE_PROJECT`               |
+| `--warn-days N`      | Report certificates that expire within `N` days as `expiring`, `0` or more. Default `30`    |
+| `--timeout DURATION` | Time allowed to read the project, such as `1m`. Default `30s`                                |
+| `--json`             | Print JSON. Also the default when stdout is not a terminal                                   |
+| `-h`, `--help`       | Print the help as text and exit `0`                                                          |
+
+## Sign in
+
+`expirely gcp` uses Application Default Credentials, the same ones the Google Cloud client libraries use. On a workstation:
+
+```sh
+gcloud auth application-default login
+```
+
+In CI, a service account through Workload Identity Federation or `GOOGLE_APPLICATION_CREDENTIALS` works the same way. The project is not read from the active `gcloud` configuration; pass `--project` or set `GOOGLE_CLOUD_PROJECT`.
+
+## Self-managed certificates
+
+Google renews a managed certificate. It never renews a self-managed one, which someone uploaded and must replace before it expires. Each line says which kind it is and, for a self-managed one, how many proxies serve it:
+
+```
+  expiring  api.example.com       12 days   Dec 08 2026  self-managed, in use by 2 resources
+  ok        www.example.com       61 days   Jan 26 2027  renews itself
+  ok        internal.example.com  203 days  Jun 17 2027  self-managed, in use by 1 resource
+```
+
+A self-managed certificate in use is highlighted and listed first within its status. A managed certificate that is still provisioning has no end date and is left out.
+
+## Permissions
+
+`expirely gcp` calls three list methods. The read-only role `roles/compute.viewer` includes them, and a custom role needs only these:
+
+```text
+compute.sslCertificates.list
+compute.targetHttpsProxies.list
+compute.targetSslProxies.list
+```
+
+## Output
+
+The JSON report is the one in [Output](/reference/output). Each result has a `gcp` object and no trust fields, since Google Cloud does not verify the chain for a host:
+
+| Field           | Meaning                                                                  |
+| --------------- | ------------------------------------------------------------------------ |
+| `gcp.name`      | The SSL certificate's name in the project                                |
+| `gcp.location`  | `global`, or the region of a regional certificate                        |
+| `gcp.managed`   | `true` for a certificate Google renews                                   |
+| `gcp.in_use_by` | The target HTTPS and SSL proxies that serve it; empty when none do       |
+
+Certificates in Certificate Manager are not read yet.
+
+## Exit codes
+
+The same as a scan: `0` when every certificate is `ok`, `1` when one is `expired` or `expiring`. A missing project or credentials exit `2` with `gcp_not_configured`; refused credentials or missing permissions exit `3` with `gcp_access_denied`, and any other Google Cloud failure exits `3` with `gcp_request_failed`. Each code is in [Error codes](/reference/error-codes).

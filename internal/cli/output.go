@@ -270,6 +270,12 @@ func note(f scan.Finding) (text string, warn bool) {
 	if f.ACM != nil {
 		return acmNote(f.ACM)
 	}
+	if f.GCP != nil {
+		if f.GCP.Managed {
+			return "renews itself", false
+		}
+		return usageNote("self-managed", len(f.GCP.InUseBy))
+	}
 	if f.TrustIssue == nil {
 		return "", false
 	}
@@ -289,7 +295,13 @@ func acmNote(a *scan.ACMInfo) (string, bool) {
 	default:
 		renewal = "does not renew"
 	}
-	switch n := len(a.InUseBy); n {
+	return usageNote(renewal, len(a.InUseBy))
+}
+
+// usageNote joins how a certificate renews with how many resources use it;
+// only a certificate in use asks for attention.
+func usageNote(renewal string, n int) (string, bool) {
+	switch n {
 	case 0:
 		return renewal + ", not in use", false
 	case 1:
@@ -302,10 +314,12 @@ func acmNote(a *scan.ACMInfo) (string, bool) {
 // inUse orders certificates in use before those nothing uses, within the
 // same status; a scanned target is always in use.
 func inUse(f scan.Finding) int {
-	if f.ACM != nil && len(f.ACM.InUseBy) == 0 {
+	switch {
+	case f.ACM != nil && len(f.ACM.InUseBy) == 0, f.GCP != nil && len(f.GCP.InUseBy) == 0:
 		return 1
+	default:
+		return 0
 	}
-	return 0
 }
 
 func summary(st ui.Style, r report) string {

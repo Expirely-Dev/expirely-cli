@@ -81,6 +81,18 @@ type Finding struct {
 	// ACM describes a certificate read from AWS Certificate Manager rather
 	// than from a handshake; it is absent for scanned targets.
 	ACM *ACMInfo `json:"acm,omitempty"`
+	// GCP describes a certificate read from a Google Cloud project; it is
+	// absent for scanned targets.
+	GCP *GCPInfo `json:"gcp,omitempty"`
+}
+
+// GCPInfo is what Google Cloud says about one of a project's SSL
+// certificates. Managed is true for a certificate Google renews.
+type GCPInfo struct {
+	Name     string   `json:"name"`
+	Location string   `json:"location"`
+	Managed  bool     `json:"managed"`
+	InUseBy  []string `json:"in_use_by"`
 }
 
 // ACMInfo is what ACM says about one of its certificates. Imported is true

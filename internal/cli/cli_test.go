@@ -363,6 +363,7 @@ func TestDocsListEveryFlag(t *testing.T) {
 	}{
 		{usage, filepath.Join("cli", "expirely.mdx")},
 		{awsUsage, filepath.Join("cli", "aws.mdx")},
+		{gcpUsage, filepath.Join("cli", "gcp.mdx")},
 	}
 	for _, p := range pages {
 		doc := readDoc(t, p.page)

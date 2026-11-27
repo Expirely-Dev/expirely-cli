@@ -55,7 +55,8 @@
             "group": "Commands",
             "pages": [
               "cli/expirely",
-              "cli/aws"
+              "cli/aws",
+              "cli/gcp"
             ]
           },
           {

@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/bycavii/expirely-cli/internal/acm"
+	"github.com/bycavii/expirely-cli/internal/gcp"
 	"github.com/bycavii/expirely-cli/internal/probe"
 	"github.com/bycavii/expirely-cli/internal/scan"
 	"github.com/bycavii/expirely-cli/internal/ui"
@@ -49,6 +50,9 @@ type Streams struct {
 	// NewACM builds the ACM client of expirely aws; nil builds the real
 	// one from the AWS configuration. Tests set it to a fake.
 	NewACM func(ctx context.Context, profile, region string) (acm.API, string, error)
+	// NewGCP builds the Compute client of expirely gcp; nil builds the real
+	// one from Application Default Credentials. Tests point it at a fake.
+	NewGCP func(ctx context.Context) (*gcp.Service, error)
 }
 
 const (
@@ -74,9 +78,11 @@ Usage
   expirely [flags] TARGET...
   expirely [flags] -f FILE
   expirely aws [flags]
+  expirely gcp [flags]
 
 Commands
   expirely aws            list the certificates in AWS Certificate Manager; see expirely aws --help
+  expirely gcp            list the SSL certificates of a Google Cloud project; see expirely gcp --help
 
 Examples
   expirely example.com api.example.com:8443
@@ -110,8 +116,13 @@ Docs: https://github.com/bycavii/expirely-cli
 // returns the exit code. Help goes to stdout and exits ExitOK; errors go to
 // stderr and exit with the code errorCodes assigns to them.
 func Run(ctx context.Context, args []string, s Streams) int {
-	if len(args) > 0 && args[0] == "aws" {
-		return runAWS(ctx, args[1:], s)
+	if len(args) > 0 {
+		switch args[0] {
+		case "aws":
+			return runAWS(ctx, args[1:], s)
+		case "gcp":
+			return runGCP(ctx, args[1:], s)
+		}
 	}
 	ag := detectAgent(s.Getenv, s.StdoutIsTerminal)
 	if ag.Name != "" {
