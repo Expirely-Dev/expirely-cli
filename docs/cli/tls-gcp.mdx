@@ -1,14 +1,14 @@
 ---
-title: expirely gcp
+title: expirely tls gcp
 description: List the certificates of a Google Cloud project and when they expire.
 ---
 
-`expirely gcp` reads every certificate one Google Cloud project's load balancers can serve: the Compute Engine SSL certificates, global and regional, and the certificates in Certificate Manager, in every location. It reports each one the way a scan reports a target, and counts the resources that use it. It only lists and changes nothing.
+`expirely tls gcp` reads every certificate one Google Cloud project's load balancers can serve: the Compute Engine SSL certificates, global and regional, and the certificates in Certificate Manager, in every location. It reports each one the way a scan reports a target, and counts the resources that use it. It only lists and changes nothing.
 
 ```sh
-expirely gcp --project acme-production
-GOOGLE_CLOUD_PROJECT=acme-production expirely gcp --warn-days 21
-expirely gcp --project acme-production --json | jq '.results[] | select(.gcp.managed | not)'
+expirely tls gcp --project acme-production
+GOOGLE_CLOUD_PROJECT=acme-production expirely tls gcp --warn-days 21
+expirely tls gcp --project acme-production --json | jq '.results[] | select(.gcp.managed | not)'
 ```
 
 | Flag                 | Description                                                                                 |
@@ -24,7 +24,7 @@ expirely gcp --project acme-production --json | jq '.results[] | select(.gcp.man
 
 ## Sign in
 
-`expirely gcp` uses Application Default Credentials, the same ones the Google Cloud client libraries use. On a workstation:
+`expirely tls gcp` uses Application Default Credentials, the same ones the Google Cloud client libraries use. On a workstation:
 
 ```sh
 gcloud auth application-default login
@@ -50,7 +50,7 @@ A self-managed certificate in use is highlighted and listed first within its sta
 
 ## Permissions
 
-`expirely gcp` calls five list methods. The read-only roles `roles/compute.viewer` and `roles/certificatemanager.viewer` include them, and a custom role needs only these:
+`expirely tls gcp` calls five list methods. The read-only roles `roles/compute.viewer` and `roles/certificatemanager.viewer` include them, and a custom role needs only these:
 
 ```text
 compute.sslCertificates.list

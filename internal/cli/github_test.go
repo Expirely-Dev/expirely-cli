@@ -24,7 +24,7 @@ func runInActions(t *testing.T, env map[string]string, client acm.API, args ...s
 		vars[k] = v
 	}
 	var out, errOut bytes.Buffer
-	code = Run(context.Background(), append([]string{"aws", "--region", "us-east-1"}, args...), Streams{
+	code = Run(context.Background(), append([]string{"tls", "aws", "--region", "us-east-1"}, args...), Streams{
 		Stdin:  strings.NewReader(""),
 		Stdout: &out,
 		Stderr: &errOut,

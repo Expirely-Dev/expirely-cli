@@ -84,7 +84,7 @@ type acmCall struct{ profile, region string }
 func runAWSWith(t *testing.T, terminal bool, f fakeACM, region string, args ...string) (code int, stdout, stderr string, call acmCall) {
 	t.Helper()
 	var out, errOut bytes.Buffer
-	code = Run(context.Background(), append([]string{"aws"}, args...), Streams{
+	code = Run(context.Background(), append([]string{"tls", "aws"}, args...), Streams{
 		Stdin:            strings.NewReader(""),
 		Stdout:           &out,
 		Stderr:           &errOut,
@@ -242,7 +242,7 @@ func okACMCert(arn, domain string) fakeACM {
 func runAWSAccount(t *testing.T, terminal bool, acct fakeAccount, args ...string) (code int, stdout, stderr string, call acmCall) {
 	t.Helper()
 	var out, errOut bytes.Buffer
-	code = Run(context.Background(), append([]string{"aws"}, args...), Streams{
+	code = Run(context.Background(), append([]string{"tls", "aws"}, args...), Streams{
 		Stdin:            strings.NewReader(""),
 		Stdout:           &out,
 		Stderr:           &errOut,

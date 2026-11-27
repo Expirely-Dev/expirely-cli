@@ -70,7 +70,7 @@ func TestRunForAgentsOnATerminal(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
-			args := append(append([]string{"--timeout", "400ms"}, tt.args...), healthy, slow)
+			args := append(append([]string{"tls", "--timeout", "400ms"}, tt.args...), healthy, slow)
 			Run(context.Background(), args, Streams{
 				Stdin:            strings.NewReader(""),
 				Stdout:           &stdout,
@@ -122,7 +122,7 @@ func TestUsageErrorsGiveAgentsTheWholeHelp(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
-			code := Run(context.Background(), tt.args, Streams{
+			code := Run(context.Background(), append([]string{"tls"}, tt.args...), Streams{
 				Stdin:            strings.NewReader(""),
 				Stdout:           &stdout,
 				Stderr:           &stderr,
@@ -135,7 +135,7 @@ func TestUsageErrorsGiveAgentsTheWholeHelp(t *testing.T) {
 			}
 			var env envelope
 			isJSON := json.Unmarshal(stderr.Bytes(), &env) == nil
-			gotUsage := strings.Contains(stderr.String(), "Exit codes") || (isJSON && env.Error.Usage == usage)
+			gotUsage := strings.Contains(stderr.String(), "Exit codes") || (isJSON && env.Error.Usage == tlsUsage)
 			if gotUsage != tt.wantUsage {
 				t.Errorf("whole help in stderr = %v, want %v:\n%s", gotUsage, tt.wantUsage, stderr.String())
 			}

@@ -26,15 +26,15 @@ const (
 // declarative and never repeat what the user typed: an agent reads them as
 // facts about the tool, not as instructions from it.
 var remediations = map[string]string{
-	CodeInvalidFlag:        "expirely --help lists every flag and the values it accepts.",
+	CodeInvalidFlag:        "Each command lists every flag and the values it accepts in its --help.",
 	CodeInvalidTarget:      "A target is host, host:port, [ipv6]:port or https://host/path; the port defaults to 443.",
-	CodeMissingArguments:   "Targets come as arguments, such as expirely example.com, or one per line from --file.",
+	CodeMissingArguments:   "Targets come as arguments, such as expirely tls example.com, or one per line from --file.",
 	CodeFileUnreadable:     "A --file needs to exist, be readable and hold one target per line of at most 64 KiB; - reads stdin.",
 	CodeInvalidCAFile:      "A --ca-file is a readable PEM file with one or more CERTIFICATE blocks, such as an internal CA's root.",
-	CodeAWSNotConfigured:   "expirely aws reads the profile from --profile or AWS_PROFILE and the region from --region, AWS_REGION or that profile, as the AWS CLI does.",
+	CodeAWSNotConfigured:   "expirely tls aws reads the profile from --profile or AWS_PROFILE and the region from --region, AWS_REGION or that profile, as the AWS CLI does.",
 	CodeAWSAccessDenied:    "The credentials were refused, expired or lack acm:ListCertificates and acm:DescribeCertificate in this account and region, or ec2:DescribeRegions for --region all.",
 	CodeAWSRequestFailed:   "ACM did not answer as expected; the message has its reason, and a later run or a longer --timeout often succeeds.",
-	CodeGCPNotConfigured:   "expirely gcp reads the project from --project, GOOGLE_CLOUD_PROJECT or CLOUDSDK_CORE_PROJECT and signs in with Application Default Credentials, as gcloud auth application-default login sets up.",
+	CodeGCPNotConfigured:   "expirely tls gcp reads the project from --project, GOOGLE_CLOUD_PROJECT or CLOUDSDK_CORE_PROJECT and signs in with Application Default Credentials, as gcloud auth application-default login sets up.",
 	CodeGCPAccessDenied:    "The credentials were refused or lack compute.sslCertificates.list, compute.targetHttpsProxies.list, compute.targetSslProxies.list, certificatemanager.locations.list or certificatemanager.certs.list in this project.",
 	CodeGCPComputeDisabled: "Google Cloud reports the Compute Engine API or billing disabled in this project, so the project serves no Compute SSL certificates.",
 	CodeGCPRequestFailed:   "Google Cloud did not answer as expected; the message has its reason, and a later run or a longer --timeout often succeeds.",

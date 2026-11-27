@@ -20,15 +20,15 @@ import (
 
 const defaultAWSTimeout = 30 * time.Second
 
-const awsUsage = `expirely aws lists the certificates in AWS Certificate Manager and when they expire.
+const awsUsage = `expirely tls aws lists the certificates in AWS Certificate Manager and when they expire.
 
 Usage
-  expirely aws [flags]
+  expirely tls aws [flags]
 
 Examples
-  expirely aws --profile production --region us-east-1
-  expirely aws --profile production --region all
-  AWS_PROFILE=production expirely aws --region us-east-1,eu-west-1 --warn-days 21
+  expirely tls aws --profile production --region us-east-1
+  expirely tls aws --profile production --region all
+  AWS_PROFILE=production expirely tls aws --region us-east-1,eu-west-1 --warn-days 21
 
 AWS
       --profile NAME      profile from the shared AWS config (default AWS_PROFILE or the default chain)
@@ -47,7 +47,7 @@ Output
       --limit N           show at most N results, most urgent first
   -h, --help              show this help
 
-expirely aws only calls acm:ListCertificates and acm:DescribeCertificate, plus
+expirely tls aws only calls acm:ListCertificates and acm:DescribeCertificate, plus
 ec2:DescribeRegions for --region all, and changes nothing. A region it cannot
 read is listed in unreadable, and the run exits 3 unless a certificate it read
 exits 1.
@@ -67,7 +67,7 @@ var accessDenied = []string{
 // them the way a scan reports targets.
 func runAWS(ctx context.Context, args []string, s Streams) int {
 	c := newCommand(s, args, awsUsage)
-	fs := flag.NewFlagSet("expirely aws", flag.ContinueOnError)
+	fs := flag.NewFlagSet("expirely tls aws", flag.ContinueOnError)
 	profile := fs.String("profile", "", "")
 	region := fs.String("region", "", "")
 	w := windowFlags(fs, defaultAWSTimeout)
@@ -77,7 +77,7 @@ func runAWS(ctx context.Context, args []string, s Streams) int {
 		return code
 	}
 	if len(rest) > 0 {
-		return c.fail(failf(CodeInvalidFlag, "expirely aws takes no targets, got %q", rest[0]))
+		return c.fail(failf(CodeInvalidFlag, "expirely tls aws takes no targets, got %q", rest[0]))
 	}
 	if e := w.check(); e != nil {
 		return c.fail(e)

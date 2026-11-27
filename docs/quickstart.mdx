@@ -11,7 +11,7 @@ description: Scan your first targets and read the result in a minute.
   </Step>
   <Step title="Scan a host">
     ```sh
-    expirely example.com
+    expirely tls example.com
     ```
 
     Each line is one target: its status (`ok`, `expiring`, `expired` or `failed`), the whole days left until the first certificate in the chain expires, the date it expires and, when the chain is not trusted, why, such as `self-signed` or `wrong name`. A target that could not be read shows the reason instead, such as `connection refused`.
@@ -26,12 +26,12 @@ description: Scan your first targets and read the result in a minute.
     ```
 
     ```sh
-    expirely -f targets.txt --warn-days 21
+    expirely tls -f targets.txt --warn-days 21
     ```
   </Step>
   <Step title="Act on the exit code">
     ```sh
-    expirely -f targets.txt || echo "a certificate needs attention"
+    expirely tls -f targets.txt || echo "a certificate needs attention"
     ```
 
     The exit code is `1` when a certificate is expired or expires within `--warn-days`, and `3` when a target could not be read. [Gate CI and alert from cron](/guides/ci) builds on it.

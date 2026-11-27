@@ -32,7 +32,7 @@ type viewReport struct {
 func runAgent(t *testing.T, terminal bool, env map[string]string, args ...string) string {
 	t.Helper()
 	var out, errOut bytes.Buffer
-	Run(context.Background(), args, Streams{
+	Run(context.Background(), append([]string{"tls"}, args...), Streams{
 		Stdin:            strings.NewReader(""),
 		Stdout:           &out,
 		Stderr:           &errOut,
@@ -249,7 +249,7 @@ func TestViewFlagsWorkOnCloudCommands(t *testing.T) {
 	endpoint := gcptest.Serve(t, "acme-prod", gcptest.Fake{Bodies: gcptest.Sample("acme-prod")})
 	var out, errOut bytes.Buffer
 
-	code := Run(context.Background(), []string{"gcp", "--project", "acme-prod", "--status", "expiring", "--limit", "1", "--fields", "gcp"}, Streams{
+	code := Run(context.Background(), []string{"tls", "gcp", "--project", "acme-prod", "--status", "expiring", "--limit", "1", "--fields", "gcp"}, Streams{
 		Stdin:  strings.NewReader(""),
 		Stdout: &out,
 		Stderr: &errOut,

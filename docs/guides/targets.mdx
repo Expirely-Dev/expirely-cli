@@ -6,7 +6,7 @@ description: Give expirely targets as arguments, from files or from another comm
 ## As arguments
 
 ```sh
-expirely example.com api.example.com:8443 https://intranet.example.com/login [2001:db8::1]:443
+expirely tls example.com api.example.com:8443 https://intranet.example.com/login [2001:db8::1]:443
 ```
 
 A target is a host, `host:port`, `[ipv6]:port`, a bare IP address or an `https://` URL. The port defaults to `443`, and the path, query and fragment of a URL are ignored. expirely rejects these before it scans anything, with [`invalid_target`](/reference/error-codes):
@@ -28,7 +28,7 @@ https://staging.example.com
 ```
 
 ```sh
-expirely -f targets.txt
+expirely tls -f targets.txt
 ```
 
 A file has one target per line; blank lines and lines starting with `#` are skipped. `--file` can be given more than once, and `-` reads stdin. An invalid line stops the command before any scan and names the file and the line, such as `targets.txt:7`.
@@ -37,11 +37,11 @@ A file has one target per line; blank lines and lines starting with `#` are skip
 
 <CodeGroup>
 ```sh Kubernetes ingresses
-kubectl get ingress -A -o jsonpath='{range .items[*].spec.tls[*].hosts[*]}{@}{"\n"}{end}' | expirely -f -
+kubectl get ingress -A -o jsonpath='{range .items[*].spec.tls[*].hosts[*]}{@}{"\n"}{end}' | expirely tls -f -
 ```
 
 ```sh A plain list
-printf 'example.com\napi.example.com:8443\n' | expirely -f -
+printf 'example.com\napi.example.com:8443\n' | expirely tls -f -
 ```
 </CodeGroup>
 
@@ -54,7 +54,7 @@ Targets from arguments come first, then each file in the order given. A target t
 A certificate issued by an internal CA shows as `untrusted issuer`, because expirely checks chains against the system roots. Give it the CA's root, in PEM, to check those chains too:
 
 ```sh
-expirely --ca-file internal-root.pem -f internal-hosts.txt
+expirely tls --ca-file internal-root.pem -f internal-hosts.txt
 ```
 
 The CAs in the file are added to the system roots, so public hosts in the same scan stay trusted. `--ca-file` can be given more than once.
@@ -64,5 +64,5 @@ The CAs in the file are added to the system roots, so public hosts in the same s
 expirely scans 16 targets at once and gives each 10 seconds to connect and complete the handshake. Raise `--concurrency` for long lists and lower `--timeout` where a slow target is already a problem:
 
 ```sh
-expirely -f targets.txt --concurrency 64 --timeout 3s
+expirely tls -f targets.txt --concurrency 64 --timeout 3s
 ```

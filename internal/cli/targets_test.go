@@ -81,7 +81,7 @@ func TestRunReadsTargetsFromStdin(t *testing.T) {
 	port := tlstest.ServeTLS(t, ca.Leaf(t, "localhost", time.Now().Add(90*24*time.Hour)))
 
 	var stdout, stderr bytes.Buffer
-	code := Run(context.Background(), []string{"-f", "-", "--concurrency", "2"}, Streams{
+	code := Run(context.Background(), []string{"tls", "-f", "-", "--concurrency", "2"}, Streams{
 		Stdin:  strings.NewReader(fmt.Sprintf("# from a pipe\nlocalhost:%d\nlocalhost:%d\n", port, port)),
 		Stdout: &stdout,
 		Stderr: &stderr,

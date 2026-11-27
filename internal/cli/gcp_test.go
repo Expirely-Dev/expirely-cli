@@ -19,7 +19,7 @@ func runGCPWith(t *testing.T, terminal bool, f gcptest.Fake, env map[string]stri
 	t.Helper()
 	endpoint := gcptest.Serve(t, "acme-prod", f)
 	var out, errOut bytes.Buffer
-	code = Run(context.Background(), append([]string{"gcp"}, args...), Streams{
+	code = Run(context.Background(), append([]string{"tls", "gcp"}, args...), Streams{
 		Stdin:            strings.NewReader(""),
 		Stdout:           &out,
 		Stderr:           &errOut,
@@ -124,7 +124,7 @@ func TestGCPErrors(t *testing.T) {
 
 func TestGCPClientError(t *testing.T) {
 	var out, errOut bytes.Buffer
-	code := Run(context.Background(), []string{"gcp", "--project", "acme-prod"}, Streams{
+	code := Run(context.Background(), []string{"tls", "gcp", "--project", "acme-prod"}, Streams{
 		Stdin:  strings.NewReader(""),
 		Stdout: &out,
 		Stderr: &errOut,

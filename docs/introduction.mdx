@@ -12,7 +12,7 @@ It sends no application data, holds no credentials and never touches a private k
 </Note>
 
 ```
-$ expirely example.com expired.badssl.com wrong.host.badssl.com localhost:1 self-signed.badssl.com untrusted-root.badssl.com
+$ expirely tls example.com expired.badssl.com wrong.host.badssl.com localhost:1 self-signed.badssl.com untrusted-root.badssl.com
 
   expired  expired.badssl.com         4,246 days ago      Apr 12 2015
   failed   localhost:1                connection refused
@@ -50,10 +50,10 @@ $ expirely example.com expired.badssl.com wrong.host.badssl.com localhost:1 self
   <Card title="Gate CI and alert from cron" icon="bell" href="/guides/ci">
     Fail a pipeline or raise an alert before a certificate expires.
   </Card>
-  <Card title="Certificates in AWS" icon="aws" href="/cli/aws">
+  <Card title="Certificates in AWS" icon="aws" href="/cli/tls-aws">
     List every ACM certificate and find the imported ones ACM never renews.
   </Card>
-  <Card title="Certificates in Google Cloud" icon="google" href="/cli/gcp">
+  <Card title="Certificates in Google Cloud" icon="google" href="/cli/tls-gcp">
     List a project's Compute and Certificate Manager certificates and find the self-managed ones Google never renews.
   </Card>
 </CardGroup>

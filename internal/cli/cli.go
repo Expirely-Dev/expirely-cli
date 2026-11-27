@@ -49,10 +49,10 @@ type Streams struct {
 	StderrIsTerminal bool
 	Style            ui.Style
 	Getenv           func(string) string
-	// NewACM opens the AWS account expirely aws reads; nil opens the real
+	// NewACM opens the AWS account expirely tls aws reads; nil opens the real
 	// one from the AWS configuration. Tests set it to a fake.
 	NewACM func(ctx context.Context, profile, region string) (acm.Account, error)
-	// NewGCP builds the Compute client of expirely gcp; nil builds the real
+	// NewGCP builds the Compute client of expirely tls gcp; nil builds the real
 	// one from Application Default Credentials. Tests point it at a fake.
 	NewGCP func(ctx context.Context) (*gcp.Service, error)
 }
@@ -63,33 +63,59 @@ const (
 	defaultConcurrency = 16
 )
 
-const tagline = "expirely tells you when the TLS certificates you serve expire."
+const tagline = "expirely tells you when your TLS certificates expire, before they break anything."
 
-// intro is what a person sees when they run expirely with nothing to scan:
-// a few ways in rather than every flag.
-const intro = tagline + `
-
-  expirely example.com          scan one host
-  expirely -f hosts.txt         scan a list, one per line
-  expirely --help               every flag
-`
-
-const usage = tagline + `
+// rootUsage is the help of expirely itself, which only routes to its
+// commands.
+const rootUsage = tagline + `
 
 Usage
-  expirely [flags] TARGET...
-  expirely [flags] -f FILE
-  expirely aws [flags]
-  expirely gcp [flags]
+  expirely <command> [flags]
 
 Commands
-  expirely aws            list the certificates in AWS Certificate Manager; see expirely aws --help
-  expirely gcp            list the certificates of a Google Cloud project; see expirely gcp --help
+  tls                     check the certificates TLS endpoints serve
+  tls aws                 list the certificates in AWS Certificate Manager
+  tls gcp                 list the certificates of a Google Cloud project
 
 Examples
-  expirely example.com api.example.com:8443
-  expirely -f hosts.txt --warn-days 21
-  cat hosts.txt | expirely -f - --json | jq .summary
+  expirely tls example.com api.example.com:8443
+  expirely tls aws
+  expirely tls gcp
+
+Flags
+      --version           print the version
+  -h, --help              show this help
+
+Each command lists its own flags with --help, such as expirely tls --help.
+
+Docs: https://github.com/expirely-dev/expirely-cli
+`
+
+// intro is what a person sees when they run expirely tls with nothing to
+// scan: a few ways in rather than every flag.
+const intro = `expirely tls checks the certificates TLS endpoints serve.
+
+  expirely tls example.com      check one host
+  expirely tls -f hosts.txt     check a list, one per line
+  expirely tls --help           every flag
+`
+
+const tlsUsage = `expirely tls checks the certificates TLS endpoints serve and when they expire.
+
+Usage
+  expirely tls [flags] TARGET...
+  expirely tls [flags] -f FILE
+  expirely tls aws [flags]
+  expirely tls gcp [flags]
+
+Commands
+  expirely tls aws        list the certificates in AWS Certificate Manager; see expirely tls aws --help
+  expirely tls gcp        list the certificates of a Google Cloud project; see expirely tls gcp --help
+
+Examples
+  expirely tls example.com api.example.com:8443
+  expirely tls -f hosts.txt --warn-days 21
+  cat hosts.txt | expirely tls -f - --json | jq .summary
 
 Targets
   -f, --file PATH         read targets from PATH, one per line; - reads stdin
@@ -125,6 +151,26 @@ Docs: https://github.com/expirely-dev/expirely-cli
 // done before the work ends, as on Ctrl-C, Run prints no results and
 // returns ExitInterrupted.
 func Run(ctx context.Context, args []string, s Streams) int {
+	if len(args) == 0 || isHelp(args[0]) {
+		fmt.Fprint(s.Stdout, rootUsage)
+		return ExitOK
+	}
+	switch {
+	case args[0] == "tls":
+		return runTLS(ctx, args[1:], s)
+	case args[0] == "aws" || args[0] == "gcp":
+		deprecated(s, "expirely "+args[0], "expirely tls "+args[0])
+		return runTLS(ctx, args, s)
+	case onlyRootFlags(args):
+		return runScan(ctx, args, s)
+	}
+	deprecated(s, "expirely TARGET", "expirely tls TARGET")
+	return runScan(ctx, args, s)
+}
+
+// runTLS runs expirely tls: a scan of the targets in args, or, when args
+// start with aws or gcp, the listing of that provider's certificates.
+func runTLS(ctx context.Context, args []string, s Streams) int {
 	if len(args) > 0 {
 		switch args[0] {
 		case "aws":
@@ -136,10 +182,40 @@ func Run(ctx context.Context, args []string, s Streams) int {
 	return runScan(ctx, args, s)
 }
 
+func isHelp(arg string) bool {
+	return arg == "help" || arg == "-h" || arg == "-help" || arg == "--help"
+}
+
+// onlyRootFlags reports whether args hold only flags expirely itself
+// takes, such as expirely --version --json, which are not a scan in the
+// old form.
+func onlyRootFlags(args []string) bool {
+	for _, a := range args {
+		switch a {
+		case "--version", "-version", "--json", "-json", "--json=true", "-json=true", "--json=false", "-json=false":
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+// deprecated warns on stderr that the command old moved to replacement,
+// as an annotation when expirely runs in GitHub Actions. The old forms
+// stop working in 1.0.
+func deprecated(s Streams, old, replacement string) {
+	msg := fmt.Sprintf("%q is now %q; the old form stops working in expirely 1.0", old, replacement)
+	if s.Getenv != nil && s.Getenv("GITHUB_ACTIONS") == "true" {
+		fmt.Fprintf(s.Stderr, "::warning title=expirely::%s\n", workflowData(msg))
+		return
+	}
+	fmt.Fprintf(s.Stderr, "expirely: %s\n", msg)
+}
+
 // runScan probes the targets named in args and in --file.
 func runScan(ctx context.Context, args []string, s Streams) int {
-	c := newCommand(s, args, usage)
-	fs := flag.NewFlagSet("expirely", flag.ContinueOnError)
+	c := newCommand(s, args, tlsUsage)
+	fs := flag.NewFlagSet("expirely tls", flag.ContinueOnError)
 	showVersion := fs.Bool("version", false, "")
 	w := windowFlags(fs, defaultTimeout)
 	concurrency := fs.Int("concurrency", defaultConcurrency, "")

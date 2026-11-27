@@ -19,9 +19,9 @@ func TestRunStopsWhenInterrupted(t *testing.T) {
 		name string
 		args []string
 	}{
-		{name: "scan", args: []string{"example.com", "example.org"}},
-		{name: "aws", args: []string{"aws", "--region", "us-east-1"}},
-		{name: "gcp", args: []string{"gcp", "--project", "acme-prod"}},
+		{name: "scan", args: []string{"tls", "example.com", "example.org"}},
+		{name: "aws", args: []string{"tls", "aws", "--region", "us-east-1"}},
+		{name: "gcp", args: []string{"tls", "gcp", "--project", "acme-prod"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

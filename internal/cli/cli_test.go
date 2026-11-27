@@ -21,7 +21,7 @@ import (
 func run(t *testing.T, terminal bool, args ...string) (code int, stdout, stderr string) {
 	t.Helper()
 	var out, errOut bytes.Buffer
-	code = Run(context.Background(), args, Streams{
+	code = Run(context.Background(), append([]string{"tls"}, args...), Streams{
 		Stdin:            strings.NewReader(""),
 		Stdout:           &out,
 		Stderr:           &errOut,
@@ -47,7 +47,7 @@ func TestRunText(t *testing.T) {
 			name:       "help prints usage to stdout",
 			args:       []string{"--help"},
 			wantCode:   ExitOK,
-			wantStdout: usage,
+			wantStdout: tlsUsage,
 		},
 		{
 			name:       "version prints the build version",
@@ -59,7 +59,7 @@ func TestRunText(t *testing.T) {
 			name:       "unknown flag is a usage error",
 			args:       []string{"--nope"},
 			wantCode:   ExitUsage,
-			wantStderr: "expirely: unknown flag --nope\nexpirely --help lists every flag and the values it accepts.\n",
+			wantStderr: "expirely: unknown flag --nope\nEach command lists every flag and the values it accepts in its --help.\n",
 		},
 		{
 			name:       "invalid target is a usage error",
@@ -255,7 +255,7 @@ func TestRunShowsProgressOnlyOnATerminal(t *testing.T) {
 	release := make(chan struct{})
 	slow := tlstest.Serve(t, func(net.Conn) { <-release })
 	t.Cleanup(func() { close(release) })
-	args := []string{"--timeout", "400ms", fmt.Sprintf("localhost:%d", slow)}
+	args := []string{"tls", "--timeout", "400ms", fmt.Sprintf("localhost:%d", slow)}
 
 	for _, terminal := range []bool{true, false} {
 		var stdout, stderr bytes.Buffer
@@ -362,9 +362,10 @@ func TestDocsListEveryFlag(t *testing.T) {
 		help string
 		page string
 	}{
-		{usage, filepath.Join("cli", "expirely.mdx")},
-		{awsUsage, filepath.Join("cli", "aws.mdx")},
-		{gcpUsage, filepath.Join("cli", "gcp.mdx")},
+		{rootUsage, filepath.Join("cli", "expirely.mdx")},
+		{tlsUsage, filepath.Join("cli", "tls.mdx")},
+		{awsUsage, filepath.Join("cli", "tls-aws.mdx")},
+		{gcpUsage, filepath.Join("cli", "tls-gcp.mdx")},
 	}
 	for _, p := range pages {
 		doc := readDoc(t, p.page)

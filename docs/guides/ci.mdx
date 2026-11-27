@@ -42,7 +42,7 @@ The summary and annotations cover every result, whatever `--status`, `--fields` 
 
 ```yaml
       - run: go install github.com/expirely-dev/expirely-cli/cmd/expirely@latest
-      - run: expirely -f targets.txt --warn-days 21
+      - run: expirely tls -f targets.txt --warn-days 21
 ```
 
 Outside a terminal expirely prints JSON, so the job log carries the full report. Add `--json=false` for the text output.
@@ -50,7 +50,7 @@ Outside a terminal expirely prints JSON, so the job log carries the full report.
 ## Cron
 
 ```sh
-expirely -f /etc/expirely/targets.txt --warn-days 14 > /var/log/expirely.json
+expirely tls -f /etc/expirely/targets.txt --warn-days 14 > /var/log/expirely.json
 case $? in
   1) echo "a certificate expires within 14 days" | mail -s "certificates" ops@example.com ;;
   3) echo "a target could not be read" | mail -s "certificates" ops@example.com ;;
@@ -60,7 +60,7 @@ esac
 ## Pick what to act on
 
 ```sh
-expirely --json -f targets.txt | jq -r '.results[] | select(.status == "expiring" or .status == "expired") | "\(.target) \(.days_left)"'
+expirely tls --json -f targets.txt | jq -r '.results[] | select(.status == "expiring" or .status == "expired") | "\(.target) \(.days_left)"'
 ```
 
 The fields are in [Output](/reference/output).

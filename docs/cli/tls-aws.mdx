@@ -1,15 +1,15 @@
 ---
-title: expirely aws
+title: expirely tls aws
 description: List the certificates in AWS Certificate Manager and when they expire.
 ---
 
-`expirely aws` reads every certificate in AWS Certificate Manager for one account, in one region, a list of regions or every enabled region, and reports each one the way a scan reports a target: its status, the days left and the date it expires. It only reads, and changes nothing.
+`expirely tls aws` reads every certificate in AWS Certificate Manager for one account, in one region, a list of regions or every enabled region, and reports each one the way a scan reports a target: its status, the days left and the date it expires. It only reads, and changes nothing.
 
 ```sh
-expirely aws --profile production --region us-east-1
-expirely aws --profile production --region all
-AWS_PROFILE=production expirely aws --warn-days 21
-expirely aws --json | jq '.results[] | select(.acm.imported and .status != "ok")'
+expirely tls aws --profile production --region us-east-1
+expirely tls aws --profile production --region all
+AWS_PROFILE=production expirely tls aws --warn-days 21
+expirely tls aws --json | jq '.results[] | select(.acm.imported and .status != "ok")'
 ```
 
 | Flag                 | Description                                                                                     |
@@ -45,7 +45,7 @@ A certificate that was never issued, such as one pending validation, has no end 
 
 ## Permissions
 
-`expirely aws` calls `acm:ListCertificates` and `acm:DescribeCertificate`, and with `--region all` also `ec2:DescribeRegions` to find the regions enabled in the account. The AWS managed policy `ReadOnlyAccess` grants all three, through `acm:Describe*`, `acm:List*` and `ec2:Describe*`. This policy is enough for every form:
+`expirely tls aws` calls `acm:ListCertificates` and `acm:DescribeCertificate`, and with `--region all` also `ec2:DescribeRegions` to find the regions enabled in the account. The AWS managed policy `ReadOnlyAccess` grants all three, through `acm:Describe*`, `acm:List*` and `ec2:Describe*`. This policy is enough for every form:
 
 ```json
 {

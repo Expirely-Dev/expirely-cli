@@ -1,80 +1,41 @@
 ---
 title: expirely
-description: Scan TLS targets and report when their certificates expire.
+description: The commands of expirely and what they share.
 ---
 
-`expirely` reads its targets from the arguments and from each `--file`, scans them, prints one result per target and exits with a code that says whether anything needs attention. The target syntax is in [Scan targets](/guides/targets).
+`expirely` itself does no work: it routes to a command. With no arguments, or with `--help`, it prints its help and exits `0`.
 
 ```sh
-expirely example.com api.example.com:8443
-expirely -f targets.txt --warn-days 21
-cat targets.txt | expirely -f - --json
-expirely -f targets.txt --concurrency 64 --timeout 3s
+expirely tls example.com api.example.com:8443
+expirely tls -f targets.txt --warn-days 21
+expirely tls aws --region all
+expirely tls gcp --project acme-production
 ```
 
-| Flag                 | Description                                                                                       |
-| -------------------- | ------------------------------------------------------------------------------------------------- |
-| `--ca-file PATH`     | Also trust the CA certificates in this PEM file, on top of the system roots. Can be given more than once |
-| `--concurrency N`    | Targets scanned at once, `1` or more. Default `16`                                                |
-| `--details`          | Add every certificate of each chain to the JSON, as `chain`. Without it, each result keeps only the leaf |
-| `--fields LIST`      | Keep only these keys in each JSON result, in the order the report prints them; `target` is always kept, and a key with no value is `null`. A comma list, or the flag repeated. Needs JSON output |
-| `--limit N`          | Show at most `N` results, `1` or more, most urgent first. No limit by default |
-| `--status LIST`      | Show only results with these statuses: `expired`, `expiring`, `error`, `ok`, or `all`. A comma list, or the flag repeated. Default `all`; a declared agent gets `expired,expiring,error` |
-| `-f`, `--file PATH`  | Read targets from `PATH`, one per line; `-` reads stdin. Can be given more than once              |
-| `-h`, `--help`       | Print the help as text and exit `0`                                                               |
-| `--json`             | Print JSON. Also the default when stdout is not a terminal                                        |
-| `--timeout DURATION` | Time each target has to connect and complete the handshake, such as `3s`. Default `10s`           |
-| `--version`          | Print the version and exit `0`                                                                    |
-| `--warn-days N`      | Report certificates that expire within `N` days as `expiring`, `0` or more. Default `30`          |
+| Command | What it does |
+| --- | --- |
+| [`expirely tls`](/cli/tls) | Checks the certificates TLS endpoints serve |
+| [`expirely tls aws`](/cli/tls-aws) | Lists the certificates in AWS Certificate Manager |
+| [`expirely tls gcp`](/cli/tls-gcp) | Lists the certificates of a Google Cloud project |
 
-Flags can come before, between or after the targets. Everything after `--` is a target.
+| Flag | Description |
+| --- | --- |
+| `--version` | Print the version and exit `0` |
+| `-h`, `--help` | Print this help and exit `0`. Each command prints its own flags with `--help` |
 
-## Status
+## Shared by every command
 
-Each target gets one status:
+Every command reports the same way: the same statuses, the same [JSON report](/reference/output), the same [error codes](/reference/error-codes), and the same exit codes: `0` when every certificate is `ok`, `1` when one is `expired` or `expiring`, `2` for a usage error, `3` when something could not be read and `130` when Ctrl-C stopped the run. `1` wins over `3`. The environment variables each command reads are in [expirely tls](/cli/tls#environment).
 
-| Status     | Meaning                                                    |
-| ---------- | ---------------------------------------------------------- |
-| `expired`  | The first certificate in the chain to expire has expired   |
-| `expiring` | It expires within `--warn-days`                            |
-| `ok`       | It expires later than that                                 |
-| `error`    | The target could not be read                               |
+## Commands that moved
 
-The status comes from the earliest `NotAfter` in the chain the server sends, so an intermediate that expires before the leaf is reported. Trust does not change the status: an untrusted chain far from expiry is `ok`, with `trusted` false.
+Before 0.9, `expirely TARGET...`, `expirely aws` and `expirely gcp` were the commands. They still work, and print a warning on stderr, or an annotation in GitHub Actions, that names the command to use instead:
 
-## Output
+| Before | Now |
+| --- | --- |
+| `expirely example.com` | `expirely tls example.com` |
+| `expirely -f targets.txt` | `expirely tls -f targets.txt` |
+| `expirely aws` | `expirely tls aws` |
+| `expirely gcp` | `expirely tls gcp` |
 
-Results go to stdout and errors to stderr. The output is JSON when `--json` is set or stdout is not a terminal, and text otherwise. JSON lists results most urgent first, the same order as the text, and is described in [Output](/reference/output). `--status`, `--fields` and `--limit` change what is shown, never the counts in `summary` or the exit code; [Show less](/reference/output#show-less) has the rules.
-
-The text output has one line per target, most urgent first, then the counts and how long the scan took:
-
-```
-  expired  expired.badssl.com         4,246 days ago      Apr 12 2015
-  failed   localhost:1                connection refused
-  ok       wrong.host.badssl.com      31 days             Dec 28 2026  wrong name
-
-  1 expired, 1 failed, 1 ok in 622ms
-```
-
-- The status comes first: `expired`, `expiring`, `failed` or `ok`. `failed` is the `error` status of JSON.
-- The default port is left out, as in `example.com`; other ports are shown.
-- A chain that is not trusted says why: `self-signed`, `untrusted issuer`, `wrong name` or `not trusted`. An expired chain needs no note.
-- In a terminal with color, `expired` and `failed` are red, `expiring` is yellow and `ok` is green. With `NO_COLOR` set or `TERM=dumb` the text is the same without color.
-- While a scan that takes longer than 150 ms runs, stderr shows `Scanning N targets` with the count finished so far, and erases that line before the results print. It appears only when stderr is a terminal, so pipes, logs, CI and agents never see it.
-
-Text taken from certificates and errors has its control characters removed before it reaches a terminal.
-
-## Environment
-
-| Variable         | Effect                                                                                     |
-| ---------------- | ------------------------------------------------------------------------------------------ |
-| `NO_COLOR`       | Text without color                                                                         |
-| `TERM=dumb`      | Text without color and no spinner                                                          |
-| `EXPIRELY_AGENT` | `1` makes expirely behave as run by an agent; `0` turns agent detection off                |
-| `AI_AGENT`, `AGENT` and agent markers | Detected AI agents get no color and no spinner; declared ones get JSON. See [AI agents and CI](/agents) |
-| `GITHUB_ACTIONS=true` | In a GitHub Actions workflow, also writes a job summary to `GITHUB_STEP_SUMMARY` and an annotation per certificate that needs attention on stderr. See [Gate CI and alert from cron](/guides/ci#github-actions) |
-| `EXPIRELY_GITHUB` | `0` turns the job summary and annotations off |
-
-## Exit codes
-
-Every exit code is computed over all results, whatever `--status`, `--fields` and `--limit` show. `0` when every target is `ok`, `1` when a certificate is `expired` or `expiring`, `2` for a usage error, `3` when a target could not be read and `130` when Ctrl-C stopped the scan, which then prints no results. `1` wins over `3`. A second Ctrl-C ends expirely at once. Each code is in [Error codes](/reference/error-codes).
+The old forms stop working in expirely 1.0.

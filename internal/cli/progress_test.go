@@ -38,8 +38,8 @@ func TestCloudCommandsShowProgressOnlyToAPersonAtATerminal(t *testing.T) {
 		args  []string
 		label string
 	}{
-		{"aws", []string{"aws", "--region", "us-east-1"}, "Reading ACM in us-east-1"},
-		{"gcp", []string{"gcp", "--project", "acme-prod"}, "Reading the certificates of project acme-prod"},
+		{"aws", []string{"tls", "aws", "--region", "us-east-1"}, "Reading ACM in us-east-1"},
+		{"gcp", []string{"tls", "gcp", "--project", "acme-prod"}, "Reading the certificates of project acme-prod"},
 	}
 	readers := []struct {
 		name     string

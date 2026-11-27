@@ -3,7 +3,7 @@ title: Output
 description: The fields of the JSON report and the error envelope.
 ---
 
-expirely prints this report when `--json` is set or stdout is not a terminal. This is the output of `expirely --json expired.badssl.com`:
+expirely prints this report when `--json` is set or stdout is not a terminal. This is the output of `expirely tls --json expired.badssl.com`:
 
 ```json
 {
@@ -56,7 +56,7 @@ The counts come before `results`, so a reader that sees only the start of a long
 
 ## Show less
 
-Three flags, on `expirely`, `expirely aws` and `expirely gcp`, shrink what the report shows. None of them changes `summary` or the exit code: a certificate that expired fails the run even when `--status ok` hides it.
+Three flags, on `expirely tls`, `expirely tls aws` and `expirely tls gcp`, shrink what the report shows. None of them changes `summary` or the exit code: a certificate that expired fails the run even when `--status ok` hides it.
 
 | Flag | Effect |
 |---|---|
@@ -66,10 +66,10 @@ Three flags, on `expirely`, `expirely aws` and `expirely gcp`, shrink what the r
 
 Lists take commas, a repeated flag, or both: `--status expired,expiring` is `--status expired --status expiring`. Every value is checked before the first connection, and an unknown status or field exits `2` with `invalid_flag`, naming the valid ones.
 
-Results are always sorted the same way, in JSON and in text: by status, `expired`, `expiring`, `error`, `ok`; then a certificate in use before one nothing uses, for `expirely aws` and `expirely gcp`; then fewest `days_left`, with unknown days last; then in the order they came. In text, a last line such as `showing 7 of 240 (--status expired,expiring; --limit 20)` says what was left out.
+Results are always sorted the same way, in JSON and in text: by status, `expired`, `expiring`, `error`, `ok`; then a certificate in use before one nothing uses, for `expirely tls aws` and `expirely tls gcp`; then fewest `days_left`, with unknown days last; then in the order they came. In text, a last line such as `showing 7 of 240 (--status expired,expiring; --limit 20)` says what was left out.
 
 ```sh
-expirely -f targets.txt --status expired,expiring --fields status,days_left --limit 20
+expirely tls -f targets.txt --status expired,expiring --fields status,days_left --limit 20
 ```
 
 ## Result
@@ -88,8 +88,8 @@ A field that could not be read is `null`, never zero or a default date.
 | `leaf` | The leaf certificate; `null` on error |
 | `chain` | Every certificate the server sent, leaf first. Present only with `--details`, and `null` on error |
 | `error` | `{"code","reason","message","remediation"}` when the target could not be read; `null` otherwise |
-| `acm` | For `expirely aws` only: what ACM says about the certificate, described in [expirely aws](/cli/aws); absent for scanned targets |
-| `gcp` | For `expirely gcp` only: what Google Cloud says about the certificate, described in [expirely gcp](/cli/gcp); absent for scanned targets |
+| `acm` | For `expirely tls aws` only: what ACM says about the certificate, described in [expirely tls aws](/cli/tls-aws); absent for scanned targets |
+| `gcp` | For `expirely tls gcp` only: what Google Cloud says about the certificate, described in [expirely tls gcp](/cli/tls-gcp); absent for scanned targets |
 
 ## Trust issues
 
@@ -123,7 +123,7 @@ A field that could not be read is `null`, never zero or a default date.
 `--version` prints `{"version":"..."}`. A command error prints one line on stderr, the error envelope:
 
 ```json
-{"error":{"code":"invalid_flag","message":"unknown flag --nope","remediation":"expirely --help lists every flag and the values it accepts."}}
+{"error":{"code":"invalid_flag","message":"unknown flag --nope","remediation":"Each command lists every flag and the values it accepts in its --help."}}
 ```
 
 Its codes are in [Error codes](/reference/error-codes).

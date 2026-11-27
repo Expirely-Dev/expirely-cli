@@ -10,7 +10,7 @@ expirely is built to be run by a program as much as by a person. An agent or a p
 When stdout is not a terminal, such as a pipe, a file or a CI log, expirely prints the JSON report. `--json` forces it in a terminal too.
 
 ```sh
-expirely -f targets.txt | jq '.summary'
+expirely tls -f targets.txt | jq '.summary'
 ```
 
 ```json
@@ -24,7 +24,7 @@ Every field is described in [Output](/reference/output). A value that could not 
 One result is about 1 KB of JSON, and agent harnesses cut long output: Claude Code shows about 10,000 characters of a command that exits non-zero, from its start and end, so a scan of a few dozen targets that finds an expiring certificate arrives cut. A declared agent therefore gets only the results that need attention, `expired`, `expiring` and `error`, unless it passes `--status`; `summary` still counts the `ok` ones, and `--status all` shows them. Nothing else changes by default, and no result limit applies unless asked for:
 
 ```sh
-expirely -f targets.txt --fields status,days_left,expires_at --limit 20
+expirely tls -f targets.txt --fields status,days_left,expires_at --limit 20
 ```
 
 `--fields` and `--limit` are in [Show less](/reference/output#show-less). The exit code always covers every result.
@@ -68,4 +68,4 @@ Every error also carries a `remediation`: what resolves it, stated as a fact abo
 
 ## Safe to run
 
-expirely only reads. It completes a TLS handshake and closes the connection, sends no application data and no credentials, and removes control characters from text taken from certificates before printing it in a terminal. Its progress spinners, in a scan and while `expirely aws` or `expirely gcp` reads, are drawn only when stderr is a terminal, so a program reading stderr gets errors and nothing else. The one exception is a GitHub Actions workflow, where stderr also carries the annotation commands the runner turns into annotations.
+expirely only reads. It completes a TLS handshake and closes the connection, sends no application data and no credentials, and removes control characters from text taken from certificates before printing it in a terminal. Its progress spinners, in a scan and while `expirely tls aws` or `expirely tls gcp` reads, are drawn only when stderr is a terminal, so a program reading stderr gets errors and nothing else. The one exception is a GitHub Actions workflow, where stderr also carries the annotation commands the runner turns into annotations.

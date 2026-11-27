@@ -14,14 +14,14 @@ import (
 
 const defaultGCPTimeout = 30 * time.Second
 
-const gcpUsage = `expirely gcp lists the certificates of a Google Cloud project and when they expire.
+const gcpUsage = `expirely tls gcp lists the certificates of a Google Cloud project and when they expire.
 
 Usage
-  expirely gcp [flags]
+  expirely tls gcp [flags]
 
 Examples
-  expirely gcp --project acme-production
-  GOOGLE_CLOUD_PROJECT=acme-production expirely gcp --warn-days 21
+  expirely tls gcp --project acme-production
+  GOOGLE_CLOUD_PROJECT=acme-production expirely tls gcp --warn-days 21
 
 Google Cloud
       --project ID        project to read (default GOOGLE_CLOUD_PROJECT or CLOUDSDK_CORE_PROJECT)
@@ -38,7 +38,7 @@ Output
       --limit N           show at most N results, most urgent first
   -h, --help              show this help
 
-expirely gcp signs in with Application Default Credentials, lists the Compute
+expirely tls gcp signs in with Application Default Credentials, lists the Compute
 SSL certificates with their target proxies and the Certificate Manager
 certificates in every location, and changes nothing. A region Google cannot
 reach is listed in unreadable, and the run exits 3 unless a certificate
@@ -49,7 +49,7 @@ it read exits 1.
 // them the way a scan reports targets.
 func runGCP(ctx context.Context, args []string, s Streams) int {
 	c := newCommand(s, args, gcpUsage)
-	fs := flag.NewFlagSet("expirely gcp", flag.ContinueOnError)
+	fs := flag.NewFlagSet("expirely tls gcp", flag.ContinueOnError)
 	project := fs.String("project", "", "")
 	w := windowFlags(fs, defaultGCPTimeout)
 	v := viewFlags(fs)
@@ -58,7 +58,7 @@ func runGCP(ctx context.Context, args []string, s Streams) int {
 		return code
 	}
 	if len(rest) > 0 {
-		return c.fail(failf(CodeInvalidFlag, "expirely gcp takes no targets, got %q", rest[0]))
+		return c.fail(failf(CodeInvalidFlag, "expirely tls gcp takes no targets, got %q", rest[0]))
 	}
 	if e := w.check(); e != nil {
 		return c.fail(e)
