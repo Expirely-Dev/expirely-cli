@@ -1,6 +1,7 @@
 golangci := "go tool -modfile=tools/golangci-lint/go.mod golangci-lint"
 govulncheck := "go tool -modfile=tools/govulncheck/go.mod govulncheck"
 goreleaser := "go tool -modfile=tools/goreleaser/go.mod goreleaser"
+actionlint := "go tool -modfile=tools/actionlint/go.mod actionlint"
 mint := "npx --yes mint@4.3.96"
 release_platforms := "linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64"
 
@@ -11,9 +12,10 @@ default:
 fmt:
     gofmt -w .
 
-# Run the pinned linters.
+# Run the pinned linters: golangci-lint on Go, actionlint on the GitHub Actions workflows.
 lint:
     {{golangci}} run ./...
+    {{actionlint}}
 
 # Check dependencies against the Go vulnerability database; needs network.
 vuln:
@@ -23,11 +25,12 @@ vuln:
 fuzz time="60s":
     go test ./internal/target/ -run '^$' -fuzz FuzzParse -fuzztime {{time}}
 
-# Run every offline check: formatting, vet, lint, race tests, build and module tidiness.
+# Run every offline check: formatting, vet, lint, workflow lint, race tests, build and module tidiness.
 check:
     test -z "$(gofmt -l .)"
     go vet ./...
     {{golangci}} run ./...
+    {{actionlint}}
     go test ./... -race -count=1
     go build ./...
     go mod tidy -diff

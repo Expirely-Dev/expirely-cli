@@ -8,7 +8,7 @@ Go 1.27 or newer and [just](https://github.com/casey/just):
 
 ```sh
 just fmt
-just check      # offline: gofmt, vet, golangci-lint, race tests, build, tidy, goreleaser check
+just check      # offline: gofmt, vet, golangci-lint, actionlint, race tests, build, tidy, goreleaser check
 just check-ci   # what CI runs: check plus govulncheck
 just fuzz       # fuzz the target parser for 60s (just fuzz 5m for longer)
 just build      # build ./bin/expirely
