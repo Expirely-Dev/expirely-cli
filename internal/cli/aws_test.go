@@ -163,8 +163,14 @@ func TestAWSJSON(t *testing.T) {
 	if err := json.Unmarshal(got.Results[2]["acm"], &info); err != nil || info.ARN != "arn:2" || !info.Imported || len(info.InUseBy) != 2 {
 		t.Errorf("results[2].acm = %s, want the imported certificate used twice", got.Results[2]["acm"])
 	}
-	if string(got.Results[2]["trusted"]) != "null" {
-		t.Errorf("results[2].trusted = %s, want null for an ACM certificate", got.Results[2]["trusted"])
+	var tlsInfo struct {
+		Trusted json.RawMessage `json:"trusted"`
+	}
+	if err := json.Unmarshal(got.Results[2]["tls"], &tlsInfo); err != nil || string(tlsInfo.Trusted) != "null" {
+		t.Errorf("results[2].tls = %s, want trusted null for an ACM certificate", got.Results[2]["tls"])
+	}
+	if string(got.Results[2]["source"]) != `"aws_acm"` {
+		t.Errorf("results[2].source = %s, want \"aws_acm\"", got.Results[2]["source"])
 	}
 }
 

@@ -69,11 +69,11 @@ func TestClassify(t *testing.T) {
 			if got.ExpiresAt == nil || !got.ExpiresAt.Equal(tt.wantExpiry) {
 				t.Errorf("ExpiresAt = %v, want %v", got.ExpiresAt, tt.wantExpiry)
 			}
-			if got.Leaf == nil || got.Leaf.Subject != "CN=leaf" {
-				t.Errorf("Leaf = %+v, want subject CN=leaf", got.Leaf)
+			if got.TLS.Leaf == nil || got.TLS.Leaf.Subject != "CN=leaf" {
+				t.Errorf("Leaf = %+v, want subject CN=leaf", got.TLS.Leaf)
 			}
-			if len(got.Chain) != len(tt.chain) {
-				t.Errorf("len(Chain) = %d, want %d", len(got.Chain), len(tt.chain))
+			if len(got.TLS.Chain) != len(tt.chain) {
+				t.Errorf("len(Chain) = %d, want %d", len(got.TLS.Chain), len(tt.chain))
 			}
 			if got.Error != nil {
 				t.Errorf("Error = %+v, want nil", got.Error)
@@ -84,17 +84,17 @@ func TestClassify(t *testing.T) {
 
 func TestClassifyTrust(t *testing.T) {
 	r := result(cert("leaf", now.Add(90*24*time.Hour)))
-	if got := Classify(r, now, 0); got.Trusted == nil || !*got.Trusted || got.VerifyError != nil {
-		t.Errorf("verified chain: Trusted = %v, VerifyError = %v, want true and nil", got.Trusted, got.VerifyError)
+	if got := Classify(r, now, 0); got.TLS.Trusted == nil || !*got.TLS.Trusted || got.TLS.VerifyError != nil {
+		t.Errorf("verified chain: Trusted = %v, VerifyError = %v, want true and nil", got.TLS.Trusted, got.TLS.VerifyError)
 	}
 
 	r.VerifyError = errors.New("x509: certificate signed by unknown authority")
 	got := Classify(r, now, 0)
-	if got.Trusted == nil || *got.Trusted {
-		t.Errorf("untrusted chain: Trusted = %v, want false", got.Trusted)
+	if got.TLS.Trusted == nil || *got.TLS.Trusted {
+		t.Errorf("untrusted chain: Trusted = %v, want false", got.TLS.Trusted)
 	}
-	if got.VerifyError == nil || *got.VerifyError != r.VerifyError.Error() {
-		t.Errorf("untrusted chain: VerifyError = %v, want %q", got.VerifyError, r.VerifyError)
+	if got.TLS.VerifyError == nil || *got.TLS.VerifyError != r.VerifyError.Error() {
+		t.Errorf("untrusted chain: VerifyError = %v, want %q", got.TLS.VerifyError, r.VerifyError)
 	}
 	if got.Status != StatusOK {
 		t.Errorf("untrusted chain: Status = %q, want %q; trust does not change the expiry status", got.Status, StatusOK)
@@ -156,7 +156,7 @@ func TestScan(t *testing.T) {
 		if f.Error != nil && f.Error.Remediation != Remediations[w.code] {
 			t.Errorf("findings[%d].Error.Remediation = %q, want the one for %q", i, f.Error.Remediation, w.code)
 		}
-		if f.DaysLeft != nil || f.Leaf != nil || f.Trusted != nil {
+		if f.DaysLeft != nil || f.TLS.Leaf != nil || f.TLS.Trusted != nil {
 			t.Errorf("findings[%d] error finding has certificate fields: %+v", i, f)
 		}
 	}
@@ -273,12 +273,15 @@ func TestExpiry(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := Expiry("api.example.com", tt.notAfter, now, 30*day)
+			got := Expiry(SourceAWSACM, "api.example.com", tt.notAfter, now, 30*day)
 
 			if got.Target != "api.example.com" || got.Status != tt.want || *got.DaysLeft != tt.wantDays || !got.ExpiresAt.Equal(tt.notAfter) {
 				t.Errorf("Expiry() = %s %s %d days %v, want %s %d days", got.Target, got.Status, *got.DaysLeft, got.ExpiresAt, tt.want, tt.wantDays)
 			}
-			if got.Trusted != nil || got.Leaf != nil || got.Chain != nil || got.Error != nil {
+			if got.Kind != KindTLSCertificate || got.Source != SourceAWSACM {
+				t.Errorf("Expiry() kind = %q, source = %q, want %q and %q", got.Kind, got.Source, KindTLSCertificate, SourceAWSACM)
+			}
+			if got.TLS.Trusted != nil || got.TLS.Leaf != nil || got.TLS.Chain != nil || got.Error != nil {
 				t.Errorf("Expiry() = %+v, want no trust, leaf, chain or error", got)
 			}
 		})

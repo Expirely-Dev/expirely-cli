@@ -41,8 +41,8 @@ Scan
 
 Output
       --json              print JSON; the default when stdout is not a terminal
-      --status LIST       show only these statuses: expired, expiring, error, ok, all
-                          (default all; a declared agent gets expired,expiring,error)
+      --status LIST       show only these statuses: expired, expiring, error, unknown, ok, all
+                          (default all; a declared agent gets expired,expiring,error,unknown)
       --fields LIST       keep only these keys in each JSON result; target is always kept
       --limit N           show at most N results, most urgent first
   -h, --help              show this help
@@ -243,7 +243,7 @@ func acmFindings(certs []acm.Certificate, region string, now time.Time, warn tim
 		if cert.NotAfter == nil {
 			continue
 		}
-		f := scan.Expiry(cert.Domain, *cert.NotAfter, now, warn)
+		f := scan.Expiry(scan.SourceAWSACM, cert.Domain, *cert.NotAfter, now, warn)
 		f.ACM = &scan.ACMInfo{
 			ARN:                cert.ARN,
 			Region:             region,

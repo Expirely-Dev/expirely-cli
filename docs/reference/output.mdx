@@ -7,32 +7,36 @@ expirely prints this report when `--json` is set or stdout is not a terminal. Th
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "scanned_at": "2026-11-26T23:13:59.39399Z",
   "warn_days": 30,
-  "summary": { "error": 0, "expired": 1, "expiring": 0, "ok": 0, "total": 1 },
-  "filter": { "status": ["expired", "expiring", "error", "ok"], "limit": null },
+  "summary": { "error": 0, "expired": 1, "expiring": 0, "ok": 0, "total": 1, "unknown": 0 },
+  "filter": { "status": ["expired", "expiring", "error", "unknown", "ok"], "limit": null },
   "matched": 1,
   "truncated": false,
   "unreadable": [],
   "results": [
     {
+      "kind": "tls_certificate",
+      "source": "endpoint",
       "target": "expired.badssl.com:443",
       "status": "expired",
       "days_left": -4246,
       "expires_at": "2015-04-12T23:59:59Z",
-      "trusted": false,
-      "trust_issue": "expired",
-      "verify_error": "x509: certificate has expired or is not yet valid: “*.badssl.com” certificate is expired",
-      "leaf": {
-        "subject": "CN=*.badssl.com,OU=Domain Control Validated+OU=PositiveSSL Wildcard",
-        "issuer": "CN=COMODO RSA Domain Validation Secure Server CA,O=COMODO CA Limited,L=Salford,ST=Greater Manchester,C=GB",
-        "serial": "4ae79549fa9abe3f100f17a478e16909",
-        "not_before": "2015-04-09T00:00:00Z",
-        "not_after": "2015-04-12T23:59:59Z",
-        "dns_names": ["*.badssl.com", "badssl.com"]
-      },
-      "error": null
+      "error": null,
+      "tls": {
+        "trusted": false,
+        "trust_issue": "expired",
+        "verify_error": "x509: certificate has expired or is not yet valid: “*.badssl.com” certificate is expired",
+        "leaf": {
+          "subject": "CN=*.badssl.com,OU=Domain Control Validated+OU=PositiveSSL Wildcard",
+          "issuer": "CN=COMODO RSA Domain Validation Secure Server CA,O=COMODO CA Limited,L=Salford,ST=Greater Manchester,C=GB",
+          "serial": "4ae79549fa9abe3f100f17a478e16909",
+          "not_before": "2015-04-09T00:00:00Z",
+          "not_after": "2015-04-12T23:59:59Z",
+          "dns_names": ["*.badssl.com", "badssl.com"]
+        }
+      }
     }
   ]
 }
@@ -42,10 +46,10 @@ expirely prints this report when `--json` is set or stdout is not a terminal. Th
 
 | Field | Meaning |
 |---|---|
-| `schema_version` | The version of this format, `1`. It changes when a field is removed or changes meaning, not when one is added |
+| `schema_version` | The version of this format, `2`. It changes when a field is removed or changes meaning, or when a `status` value is added; adding a field keeps it. [Schema 1](#from-schema-1) lists what changed |
 | `scanned_at` | When the scan ran, RFC 3339 in UTC |
 | `warn_days` | The `--warn-days` value used |
-| `summary` | Count of every result per status, `ok`, `expiring`, `expired` and `error`, and their `total`. Filters never change it |
+| `summary` | Count of every result per status, `ok`, `expiring`, `expired`, `error` and `unknown`, and their `total`. Filters never change it |
 | `filter` | What the report shows: `status`, the statuses shown, most urgent first, and `limit`, the `--limit` value or `null` |
 | `matched` | How many results have a status in `filter.status`, before `--limit` |
 | `truncated` | `true` when `--limit` left out some of the `matched` results; always present |
@@ -60,13 +64,13 @@ Three flags, on `expirely tls`, `expirely tls aws` and `expirely tls gcp`, shrin
 
 | Flag | Effect |
 |---|---|
-| `--status LIST` | Shows only results with these statuses. `all` shows every status, the default. A declared [AI agent](/agents) that passes no `--status` gets `expired,expiring,error` |
+| `--status LIST` | Shows only results with these statuses. `all` shows every status, the default. A declared [AI agent](/agents) that passes no `--status` gets `expired,expiring,error,unknown` |
 | `--limit N` | Shows at most `N` of the matched results, the most urgent ones; `truncated` says whether any were left out |
-| `--fields LIST` | Keeps only these keys in each result, in the order below, with `target` always first. A key the result has no value for, such as `acm` on a scanned target, is `null`. `--fields chain` keeps the chain without `--details`. It needs JSON output |
+| `--fields LIST` | Keeps only these top-level keys in each result, in the order below, with `target` always first. A key the result has no value for, such as `acm` on a scanned target, is `null`. `--fields tls` keeps the whole `tls` object; its `chain` still needs `--details`. It needs JSON output |
 
 Lists take commas, a repeated flag, or both: `--status expired,expiring` is `--status expired --status expiring`. Every value is checked before the first connection, and an unknown status or field exits `2` with `invalid_flag`, naming the valid ones.
 
-Results are always sorted the same way, in JSON and in text: by status, `expired`, `expiring`, `error`, `ok`; then a certificate in use before one nothing uses, for `expirely tls aws` and `expirely tls gcp`; then fewest `days_left`, with unknown days last; then in the order they came. In text, a last line such as `showing 7 of 240 (--status expired,expiring; --limit 20)` says what was left out.
+Results are always sorted the same way, in JSON and in text: by status, `expired`, `expiring`, `error`, `unknown`, `ok`; then a certificate in use before one nothing uses, for `expirely tls aws` and `expirely tls gcp`; then fewest `days_left`, with unknown days last; then in the order they came. In text, a last line such as `showing 7 of 240 (--status expired,expiring; --limit 20)` says what was left out.
 
 ```sh
 expirely tls -f targets.txt --status expired,expiring --fields status,days_left --limit 20
@@ -74,22 +78,42 @@ expirely tls -f targets.txt --status expired,expiring --fields status,days_left 
 
 ## Result
 
-A field that could not be read is `null`, never zero or a default date.
+A field that could not be read is `null`, never zero or a default date. Every result has the same common fields, whatever its kind; what only one kind or one source has lives in its own object.
 
 | Field | Meaning |
 |---|---|
-| `target` | `host:port` as scanned |
-| `status` | `ok`, `expiring`, `expired` or `error` |
-| `days_left` | Whole days until `expires_at`, negative once expired; `null` on error |
-| `expires_at` | The earliest `NotAfter` in the chain; `null` on error |
-| `trusted` | Whether the chain verifies for the host against the system roots; `null` on error |
-| `trust_issue` | Why the chain does not verify, as one of the values below; `null` when it does or on error |
-| `verify_error` | The full verification error; `null` when the chain verifies or on error |
-| `leaf` | The leaf certificate; `null` on error |
-| `chain` | Every certificate the server sent, leaf first. Present only with `--details`, and `null` on error |
+| `kind` | The kind of resource: `tls_certificate` for every command today |
+| `source` | Where the result was read: `endpoint` for `expirely tls`, `aws_acm` for `expirely tls aws`, `gcp` for `expirely tls gcp` |
+| `target` | `host:port` as scanned, or the certificate's domain for a cloud source |
+| `status` | `ok`, `expiring`, `expired`, `error` or `unknown` |
+| `days_left` | Whole days until `expires_at`, negative once expired; `null` on error or when unknown |
+| `expires_at` | When the resource stops working: for a chain, its earliest `NotAfter`; `null` on error or when unknown |
 | `error` | `{"code","reason","message","remediation"}` when the target could not be read; `null` otherwise |
-| `acm` | For `expirely tls aws` only: what ACM says about the certificate, described in [expirely tls aws](/cli/tls-aws); absent for scanned targets |
-| `gcp` | For `expirely tls gcp` only: what Google Cloud says about the certificate, described in [expirely tls gcp](/cli/tls-gcp); absent for scanned targets |
+| `tls` | What the handshake revealed, described below. Its fields are `null` on error and for a cloud source, which does not verify the chain for a host |
+| `acm` | For `expirely tls aws` only: what ACM says about the certificate, described in [expirely tls aws](/cli/tls-aws); absent for other sources |
+| `gcp` | For `expirely tls gcp` only: what Google Cloud says about the certificate, described in [expirely tls gcp](/cli/tls-gcp); absent for other sources |
+
+## Status
+
+| Status | Meaning | Exit |
+|---|---|---|
+| `expired` | `expires_at` has passed | `1` |
+| `expiring` | `expires_at` is within `--warn-days` | `1` |
+| `error` | The target could not be read; `error` says why | `3` |
+| `unknown` | The resource exists, but its end date could not be read | `3` |
+| `ok` | `expires_at` is later than `--warn-days` | `0` |
+
+`1` wins over `3`. A new status value raises `schema_version`, so a reader that handles every value of its version is never surprised.
+
+## TLS
+
+| Field | Meaning |
+|---|---|
+| `tls.trusted` | Whether the chain verifies for the host against the system roots |
+| `tls.trust_issue` | Why the chain does not verify, as one of the values below; `null` when it does |
+| `tls.verify_error` | The full verification error; `null` when the chain verifies |
+| `tls.leaf` | The leaf certificate |
+| `tls.chain` | Every certificate the server sent, leaf first. Present only with `--details` |
 
 ## Trust issues
 
@@ -107,7 +131,7 @@ A field that could not be read is `null`, never zero or a default date.
 
 ## Certificate
 
-`leaf` and each entry of `chain` have these fields. The chain is most of a report's size, so it is left out unless `--details` asks for it:
+`tls.leaf` and each entry of `tls.chain` have these fields. The chain is most of a report's size, so it is left out unless `--details` asks for it:
 
 | Field | Meaning |
 |---|---|
@@ -117,6 +141,19 @@ A field that could not be read is `null`, never zero or a default date.
 | `not_before` | Start of validity, RFC 3339 in UTC |
 | `not_after` | End of validity, RFC 3339 in UTC |
 | `dns_names` | Subject alternative names of type DNS |
+
+## From schema 1
+
+Schema 2 moved the fields only a TLS certificate has into `tls`, added `kind` and `source`, and added the `unknown` status.
+
+| Schema 1 | Schema 2 |
+|---|---|
+| `.trusted`, `.trust_issue`, `.verify_error`, `.leaf`, `.chain` | `.tls.trusted`, `.tls.trust_issue`, `.tls.verify_error`, `.tls.leaf`, `.tls.chain` |
+| `--fields trusted,leaf` | `--fields tls` |
+| `--fields chain`, without `--details` | `--fields tls --details` |
+| Four statuses | `unknown` added; it exits `3` |
+
+`target`, `status`, `days_left`, `expires_at`, `error`, `acm`, `gcp` and every report field other than `schema_version` keep their meaning. A reader that supports both checks `schema_version` first.
 
 ## Other output
 

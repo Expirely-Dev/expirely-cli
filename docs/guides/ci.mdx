@@ -3,7 +3,7 @@ title: Gate CI and alert from cron
 description: Fail a pipeline or raise an alert before a certificate expires.
 ---
 
-expirely exits with `1` when any certificate is expired or expires within `--warn-days`, with `3` when a target could not be read, and with `0` otherwise. Any runner that stops on a non-zero exit code can use it as a gate.
+expirely exits with `1` when any certificate is expired or expires within `--warn-days`, with `3` when a target could not be read or a certificate's end date is `unknown`, and with `0` otherwise. Any runner that stops on a non-zero exit code can use it as a gate.
 
 ## GitHub Actions
 

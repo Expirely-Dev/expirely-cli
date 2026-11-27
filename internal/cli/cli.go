@@ -24,8 +24,8 @@ import (
 
 // Exit codes returned by Run, in order of precedence when a scan has
 // several outcomes: ExitFindings when any certificate is expired or
-// expiring, then ExitFailure when any target could not be read or a cloud
-// command could not read every region.
+// expiring, then ExitFailure when any target could not be read, any end
+// date is unknown or a cloud command could not read every region.
 // ExitInterrupted, 128 plus SIGINT as shells report it, means the run was
 // stopped before it ended and printed no results.
 const (
@@ -131,16 +131,16 @@ Scan
 Output
       --json              print JSON; the default when stdout is not a terminal
       --details           add every certificate of each chain to the JSON
-      --status LIST       show only these statuses: expired, expiring, error, ok, all
-                          (default all; a declared agent gets expired,expiring,error)
+      --status LIST       show only these statuses: expired, expiring, error, unknown, ok, all
+                          (default all; a declared agent gets expired,expiring,error,unknown)
       --fields LIST       keep only these keys in each JSON result; target is always kept
       --limit N           show at most N results, most urgent first
       --version           print the version
   -h, --help              show this help
 
 Exit codes, over every result whatever --status, --fields and --limit show
-  0 all ok, 1 expired or expiring, 2 usage error, 3 a target could not be read,
-  130 stopped by Ctrl-C
+  0 all ok, 1 expired or expiring, 2 usage error, 3 a target could not be read
+  or an end date is unknown, 130 stopped by Ctrl-C
 
 Docs: https://github.com/expirely-dev/expirely-cli
 `

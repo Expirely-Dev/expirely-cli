@@ -38,15 +38,17 @@ func TestRunTrustsAnInternalCAFromCAFile(t *testing.T) {
 			}
 			var got struct {
 				Results []struct {
-					Trusted    bool `json:"trusted"`
-					TrustIssue any  `json:"trust_issue"`
+					TLS struct {
+						Trusted    bool `json:"trusted"`
+						TrustIssue any  `json:"trust_issue"`
+					} `json:"tls"`
 				}
 			}
 			if err := json.Unmarshal([]byte(stdout), &got); err != nil {
 				t.Fatalf("stdout is not the JSON report: %v", err)
 			}
-			if r := got.Results[0]; r.Trusted != tt.wantTrusted || r.TrustIssue != tt.wantIssue {
-				t.Errorf("trusted = %v, trust_issue = %v; want %v and %v", r.Trusted, r.TrustIssue, tt.wantTrusted, tt.wantIssue)
+			if r := got.Results[0].TLS; r.Trusted != tt.wantTrusted || r.TrustIssue != tt.wantIssue {
+				t.Errorf("tls.trusted = %v, tls.trust_issue = %v; want %v and %v", r.Trusted, r.TrustIssue, tt.wantTrusted, tt.wantIssue)
 			}
 		})
 	}

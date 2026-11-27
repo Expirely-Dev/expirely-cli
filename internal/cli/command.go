@@ -211,7 +211,7 @@ func exitCode(findings []scan.Finding) int {
 		switch f.Status {
 		case scan.StatusExpired, scan.StatusExpiring:
 			return ExitFindings
-		case scan.StatusError:
+		case scan.StatusError, scan.StatusUnknown:
 			code = ExitFailure
 		}
 	}

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -31,13 +32,14 @@ func sampleReport() report {
 		return &at
 	}
 	findings := []scan.Finding{
-		{Target: "example.com:443", Status: scan.StatusOK, DaysLeft: ptr(88), ExpiresAt: expires("2027-02-22T23:53:00Z"), Trusted: ptr(true)},
+		{Target: "example.com:443", Status: scan.StatusOK, DaysLeft: ptr(88), ExpiresAt: expires("2027-02-22T23:53:00Z"), TLS: scan.TLSInfo{Trusted: ptr(true)}},
 		{Target: "localhost:1", Status: scan.StatusError, Error: &scan.FindingError{Code: scan.CodeDialFailed, Reason: "connection refused", Message: "dial localhost:1: connection refused"}},
-		{Target: "expired.badssl.com:443", Status: scan.StatusExpired, DaysLeft: ptr(-4246), ExpiresAt: expires("2015-04-12T23:59:59Z"), Trusted: ptr(false), TrustIssue: ptr(scan.TrustExpired)},
-		{Target: "soon.example.com:8443", Status: scan.StatusExpiring, DaysLeft: ptr(1), ExpiresAt: expires("2026-11-28T10:00:00Z"), Trusted: ptr(true)},
-		{Target: "wrong.host.badssl.com:443", Status: scan.StatusOK, DaysLeft: ptr(31), ExpiresAt: expires("2026-12-28T20:02:00Z"), Trusted: ptr(false), TrustIssue: ptr(scan.TrustNameMismatch)},
-		{Target: "self-signed.badssl.com:443", Status: scan.StatusOK, DaysLeft: ptr(727), ExpiresAt: expires("2028-11-23T21:00:00Z"), Trusted: ptr(false), TrustIssue: ptr(scan.TrustSelfSigned)},
-		{Target: "evil\x1b[2J.example:443", Status: scan.StatusOK, DaysLeft: ptr(0), ExpiresAt: expires("2026-11-27T01:00:00Z"), Trusted: ptr(false), TrustIssue: ptr(scan.TrustUnknownAuthority)},
+		{Target: "expired.badssl.com:443", Status: scan.StatusExpired, DaysLeft: ptr(-4246), ExpiresAt: expires("2015-04-12T23:59:59Z"), TLS: scan.TLSInfo{Trusted: ptr(false), TrustIssue: ptr(scan.TrustExpired)}},
+		{Target: "soon.example.com:8443", Status: scan.StatusExpiring, DaysLeft: ptr(1), ExpiresAt: expires("2026-11-28T10:00:00Z"), TLS: scan.TLSInfo{Trusted: ptr(true)}},
+		{Target: "wrong.host.badssl.com:443", Status: scan.StatusOK, DaysLeft: ptr(31), ExpiresAt: expires("2026-12-28T20:02:00Z"), TLS: scan.TLSInfo{Trusted: ptr(false), TrustIssue: ptr(scan.TrustNameMismatch)}},
+		{Target: "self-signed.badssl.com:443", Status: scan.StatusOK, DaysLeft: ptr(727), ExpiresAt: expires("2028-11-23T21:00:00Z"), TLS: scan.TLSInfo{Trusted: ptr(false), TrustIssue: ptr(scan.TrustSelfSigned)}},
+		{Target: "pending.example.com", Status: scan.StatusUnknown},
+		{Target: "evil\x1b[2J.example:443", Status: scan.StatusOK, DaysLeft: ptr(0), ExpiresAt: expires("2026-11-27T01:00:00Z"), TLS: scan.TLSInfo{Trusted: ptr(false), TrustIssue: ptr(scan.TrustUnknownAuthority)}},
 	}
 	return newReport(time.Date(2026, 11, 26, 22, 0, 0, 0, time.UTC), 30, findings, nil)
 }
@@ -128,13 +130,65 @@ func TestRunJSONLeavesTheChainOutUnlessAsked(t *testing.T) {
 		if err := json.Unmarshal([]byte(stdout), &got); err != nil {
 			t.Fatalf("stdout is not the JSON report: %v\n%s", err, stdout)
 		}
-		if got.SchemaVersion == nil || *got.SchemaVersion != 1 {
-			t.Errorf("schema_version = %v, want 1", got.SchemaVersion)
+		if got.SchemaVersion == nil || *got.SchemaVersion != 2 {
+			t.Errorf("schema_version = %v, want 2", got.SchemaVersion)
 		}
-		_, hasChain := got.Results[0]["chain"]
-		_, hasLeaf := got.Results[0]["leaf"]
+		var tlsInfo map[string]json.RawMessage
+		if err := json.Unmarshal(got.Results[0]["tls"], &tlsInfo); err != nil {
+			t.Fatalf("results[0].tls = %s, want an object: %v", got.Results[0]["tls"], err)
+		}
+		_, hasChain := tlsInfo["chain"]
+		_, hasLeaf := tlsInfo["leaf"]
 		if hasChain != details || !hasLeaf {
 			t.Errorf("--details=%v: chain present = %v, leaf present = %v; want chain only with --details and the leaf always", details, hasChain, hasLeaf)
 		}
+	}
+}
+
+func TestExitCodeCountsUnknownAsUnread(t *testing.T) {
+	tests := []struct {
+		name     string
+		statuses []scan.Status
+		want     int
+	}{
+		{name: "all ok", statuses: []scan.Status{scan.StatusOK}, want: ExitOK},
+		{name: "an unknown end date", statuses: []scan.Status{scan.StatusOK, scan.StatusUnknown}, want: ExitFailure},
+		{name: "unknown and expiring", statuses: []scan.Status{scan.StatusUnknown, scan.StatusExpiring}, want: ExitFindings},
+		{name: "unknown and expired", statuses: []scan.Status{scan.StatusExpired, scan.StatusUnknown}, want: ExitFindings},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			findings := make([]scan.Finding, len(tt.statuses))
+			for i, s := range tt.statuses {
+				findings[i] = scan.Finding{Target: "example.com:443", Status: s}
+			}
+			if got := exitCode(findings); got != tt.want {
+				t.Errorf("exitCode(%v) = %d, want %d", tt.statuses, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestUnknownSortsAfterErrorAndBeforeOK(t *testing.T) {
+	findings := []scan.Finding{
+		{Target: "ok", Status: scan.StatusOK, DaysLeft: ptr(10)},
+		{Target: "unknown", Status: scan.StatusUnknown},
+		{Target: "error", Status: scan.StatusError},
+	}
+	var got []string
+	for _, f := range byUrgency(findings) {
+		got = append(got, f.Target)
+	}
+	if want := []string{"error", "unknown", "ok"}; !slices.Equal(got, want) {
+		t.Errorf("byUrgency order = %v, want %v", got, want)
+	}
+}
+
+func TestAnnotationForUnknownEndDate(t *testing.T) {
+	var b bytes.Buffer
+	f := scan.Finding{Target: "pending.example.com", Status: scan.StatusUnknown}
+	writeAnnotations(&b, newReport(time.Now(), 30, []scan.Finding{f}, nil), []scan.Finding{f})
+	if want := "::error title=Certificate end date unknown%3A pending.example.com::pending.example.com has no end date to read.\n"; b.String() != want {
+		t.Errorf("annotations = %q, want %q", b.String(), want)
 	}
 }

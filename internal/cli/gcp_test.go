@@ -153,7 +153,7 @@ func TestGCPFindings(t *testing.T) {
 	if len(got) != 1 {
 		t.Fatalf("len(findings) = %d, want 1; a certificate not issued yet has no end date", len(got))
 	}
-	if f := got[0]; f.Target != "api.example.com" || f.Status != scan.StatusExpiring || f.GCP.Managed || f.GCP.InUseBy == nil || f.Trusted != nil {
+	if f := got[0]; f.Target != "api.example.com" || f.Status != scan.StatusExpiring || f.GCP.Managed || f.GCP.InUseBy == nil || f.Source != scan.SourceGCP || f.TLS.Trusted != nil {
 		t.Errorf("findings[0] = %+v, gcp = %+v; want an expiring self-managed certificate, an empty in_use_by and no trust fields", f, f.GCP)
 	}
 }

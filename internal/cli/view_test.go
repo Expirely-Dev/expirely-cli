@@ -160,9 +160,13 @@ func TestFieldsProjectEachResult(t *testing.T) {
 		t.Errorf("stdout = %s, want the summary kept", stdout)
 	}
 
-	_, stdout, _ = run(t, false, append([]string{"--fields", "chain"}, targets[0])...)
-	if r := decodeView(t, stdout); len(r.Results) != 1 || string(r.Results[0]["chain"]) == "null" {
-		t.Errorf("--fields chain = %s, want the chain without --details", stdout)
+	_, stdout, _ = run(t, false, append([]string{"--fields", "tls"}, targets[0])...)
+	if r := decodeView(t, stdout); len(r.Results) != 1 || !strings.Contains(string(r.Results[0]["tls"]), `"leaf":{`) || strings.Contains(string(r.Results[0]["tls"]), `"chain"`) {
+		t.Errorf("--fields tls = %s, want the tls object with its leaf and without the chain", stdout)
+	}
+	_, stdout, _ = run(t, false, append([]string{"--fields", "tls", "--details"}, targets[0])...)
+	if r := decodeView(t, stdout); len(r.Results) != 1 || !strings.Contains(string(r.Results[0]["tls"]), `"chain":[`) {
+		t.Errorf("--fields tls --details = %s, want the chain in the tls object", stdout)
 	}
 }
 
@@ -174,8 +178,8 @@ func TestViewFlagsAreCheckedBeforeAnyScan(t *testing.T) {
 		args     []string
 		wantMsg  string
 	}{
-		{name: "unknown status", args: []string{"--status", "expired,stale"}, wantMsg: `unknown status "stale" in --status; valid: expired, expiring, error, ok, all`},
-		{name: "unknown field", args: []string{"--fields", "target,days"}, wantMsg: `unknown field "days" in --fields; valid: target, status, days_left`},
+		{name: "unknown status", args: []string{"--status", "expired,stale"}, wantMsg: `unknown status "stale" in --status; valid: expired, expiring, error, unknown, ok, all`},
+		{name: "unknown field", args: []string{"--fields", "target,days"}, wantMsg: `unknown field "days" in --fields; valid: kind, source, target, status, days_left`},
 		{name: "zero limit", args: []string{"--limit", "0"}, wantMsg: "--limit must be 1 or more, got 0"},
 		{name: "negative limit", args: []string{"--limit", "-3"}, wantMsg: "--limit must be 1 or more, got -3"},
 		{name: "fields on text", terminal: true, args: []string{"--fields", "status"}, wantMsg: "--fields selects JSON fields, and this run prints text"},
@@ -212,7 +216,7 @@ func TestDeclaredAgentsSeeWhatNeedsAttention(t *testing.T) {
 	if got := targetsOf(r); !slices.Equal(got, []string{targets[2], targets[1]}) {
 		t.Errorf("results = %v, want the expired and expiring certificates and no ok one", got)
 	}
-	if !slices.Equal(r.Filter.Status, []string{"expired", "expiring", "error"}) || r.Summary["ok"] != 1 || r.Summary["total"] != 3 {
+	if !slices.Equal(r.Filter.Status, []string{"expired", "expiring", "error", "unknown"}) || r.Summary["ok"] != 1 || r.Summary["total"] != 3 {
 		t.Errorf("filter = %v, summary = %v; want the default agent statuses and every result counted", r.Filter.Status, r.Summary)
 	}
 
