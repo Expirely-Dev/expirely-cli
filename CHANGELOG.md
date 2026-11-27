@@ -2,6 +2,13 @@
 
 Every release of expirely, newest first. From v0.4.0 on, release-please writes this file from the commit titles. Until 1.0, a release can change flags, JSON fields and codes; such a change is listed as breaking, with what to do.
 
+## [0.4.0](https://github.com/bycavii/expirely-cli/compare/v0.3.0...v0.4.0) (2026-11-27)
+
+
+### Added
+
+* **gcp:** list compute ssl certificates with expirely gcp ([0de7f0a](https://github.com/bycavii/expirely-cli/commit/0de7f0a4d4c6362c2e5b92206a107821efb7ebf9))
+
 ## v0.3.0 - 2026-11-26
 
 ### Added
