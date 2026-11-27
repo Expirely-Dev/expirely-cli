@@ -25,7 +25,7 @@ Scripts and agents match on `code`; a code is never renamed or reused. Each erro
 
 | Code | Exit | Meaning |
 |---|---|---|
-| `invalid_flag` | 2 | A flag is unknown or has a bad value |
+| `invalid_flag` | 2 | A flag is unknown or has a bad value. An unknown flag is named as it was typed and, when one is close, followed by the flag meant: `unknown flag -v; did you mean --version?` |
 | `invalid_target` | 2 | A target is not a host, host:port or https:// URL |
 | `missing_arguments` | 2 | No target was given in the arguments or files |
 | `file_unreadable` | 2 | A `--file` could not be opened or read, or has a line over 64 KiB |

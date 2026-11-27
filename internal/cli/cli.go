@@ -223,16 +223,77 @@ func version() string {
 }
 
 // flagError rewrites the flag package's messages in the form people type
-// flags: "flag provided but not defined: -nope" becomes "unknown flag
-// --nope", and "flag needs an argument: -timeout" becomes "--timeout needs a
+// flags. An unknown flag is named as args gave it, since the flag package
+// drops the dashes, and is followed by the closest flag fs defines, if
+// suggest finds one: "-v" becomes "unknown flag -v; did you mean
+// --version?". "flag needs an argument: -timeout" becomes "--timeout needs a
 // value". Other messages are kept, with their flag names given two dashes.
-func flagError(err error) string {
+func flagError(fs *flag.FlagSet, args []string, err error) string {
 	msg := err.Error()
 	if name, ok := strings.CutPrefix(msg, "flag provided but not defined: -"); ok {
-		return "unknown flag --" + strings.TrimPrefix(name, "-")
+		text := "unknown flag " + typed(args, name)
+		if s := suggest(fs, name); s != "" {
+			text += "; did you mean --" + s + "?"
+		}
+		return text
 	}
 	if name, ok := strings.CutPrefix(msg, "flag needs an argument: -"); ok {
 		return "--" + strings.TrimPrefix(name, "-") + " needs a value"
 	}
 	return strings.Replace(msg, " flag -", " flag --", 1)
+}
+
+// typed returns the argument, up to any "=", that named the flag name, with
+// the dashes it was given; "--" + name when no argument did.
+func typed(args []string, name string) string {
+	for _, a := range args {
+		if a == "--" {
+			break
+		}
+		flagPart, _, _ := strings.Cut(a, "=")
+		if trimmed := strings.TrimLeft(flagPart, "-"); trimmed == name && flagPart != trimmed {
+			return flagPart
+		}
+	}
+	return "--" + name
+}
+
+// suggest returns the flag of fs closest to the unknown name: version for
+// -v or -V, which people try for it, or the flag at the smallest edit
+// distance when that distance is under half the name's length. It returns
+// "" when no flag is that close.
+func suggest(fs *flag.FlagSet, name string) string {
+	lower := strings.ToLower(name)
+	if lower == "v" && fs.Lookup("version") != nil {
+		return "version"
+	}
+	best, bestDist := "", 0
+	fs.VisitAll(func(f *flag.Flag) {
+		d := editDistance(lower, f.Name)
+		if 2*d < len(lower) && (best == "" || d < bestDist) {
+			best, bestDist = f.Name, d
+		}
+	})
+	return best
+}
+
+// editDistance is the Levenshtein distance between a and b, in bytes.
+func editDistance(a, b string) int {
+	prev := make([]int, len(b)+1)
+	for j := range prev {
+		prev[j] = j
+	}
+	for i := 1; i <= len(a); i++ {
+		cur := make([]int, len(b)+1)
+		cur[0] = i
+		for j := 1; j <= len(b); j++ {
+			cost := 1
+			if a[i-1] == b[j-1] {
+				cost = 0
+			}
+			cur[j] = min(prev[j]+1, cur[j-1]+1, prev[j-1]+cost)
+		}
+		prev = cur
+	}
+	return prev[len(b)]
 }

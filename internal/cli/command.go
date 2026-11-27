@@ -54,7 +54,7 @@ func (c *command) parse(fs *flag.FlagSet, args []string) (rest []string, code in
 			fmt.Fprint(c.Stdout, c.help)
 			return nil, ExitOK, true
 		}
-		return nil, c.fail(failf(CodeInvalidFlag, "%s", flagError(err))), true
+		return nil, c.fail(failf(CodeInvalidFlag, "%s", flagError(fs, args, err))), true
 	}
 	fs.Visit(func(f *flag.Flag) {
 		if f.Name == "json" {

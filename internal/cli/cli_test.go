@@ -387,7 +387,15 @@ func TestFlagError(t *testing.T) {
 		want string
 	}{
 		{[]string{"--nope"}, "unknown flag --nope"},
-		{[]string{"-nope"}, "unknown flag --nope"},
+		{[]string{"-nope"}, "unknown flag -nope"},
+		{[]string{"-v"}, "unknown flag -v; did you mean --version?"},
+		{[]string{"-V"}, "unknown flag -V; did you mean --version?"},
+		{[]string{"--limt", "3", "example.com"}, "unknown flag --limt; did you mean --limit?"},
+		{[]string{"--warn-day=21", "example.com"}, "unknown flag --warn-day; did you mean --warn-days?"},
+		{[]string{"example.com", "--jsn"}, "unknown flag --jsn; did you mean --json?"},
+		{[]string{"--nope", "--", "--nope"}, "unknown flag --nope"},
+		{[]string{"aws", "-v"}, "unknown flag -v"},
+		{[]string{"gcp", "--projet", "x"}, "unknown flag --projet; did you mean --project?"},
 		{[]string{"--warn-days", "x"}, `invalid value "x" for flag --warn-days: parse error`},
 		{[]string{"--timeout"}, "--timeout needs a value"},
 	}
@@ -396,6 +404,21 @@ func TestFlagError(t *testing.T) {
 		if !strings.HasPrefix(stderr, "expirely: "+tt.want+"\n") {
 			t.Errorf("args %q: stderr = %q, want message %q", tt.args, stderr, tt.want)
 		}
+	}
+}
+
+func TestFlagSuggestionReachesAgents(t *testing.T) {
+	_, stdout, stderr := run(t, false, "-v")
+
+	var got envelope
+	if err := json.Unmarshal([]byte(stderr), &got); err != nil {
+		t.Fatalf("stderr is not the error envelope: %v\n%s", err, stderr)
+	}
+	if got.Error.Code != CodeInvalidFlag || got.Error.Message != "unknown flag -v; did you mean --version?" {
+		t.Errorf("error = %+v, want invalid_flag naming -v and suggesting --version", got.Error)
+	}
+	if stdout != "" {
+		t.Errorf("stdout = %q, want nothing", stdout)
 	}
 }
 
