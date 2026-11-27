@@ -42,14 +42,18 @@ cannot reach is listed in unreadable, and the run exits 3 unless a
 certificate it read exits 1.
 `
 
+// newGCPFlags defines the flags of expirely tls gcp.
+func newGCPFlags() (fs *flag.FlagSet, project *string, w *window, v *view) {
+	fs = flag.NewFlagSet("expirely tls gcp", flag.ContinueOnError)
+	project = fs.String("project", "", "")
+	return fs, project, windowFlags(fs, defaultGCPTimeout), viewFlags(fs)
+}
+
 // runGCP lists the certificates of one Google Cloud project and reports
 // them the way a scan reports targets.
 func runGCP(ctx context.Context, args []string, s Streams) int {
 	c := newCommand(s, args, gcpUsage)
-	fs := flag.NewFlagSet("expirely tls gcp", flag.ContinueOnError)
-	project := fs.String("project", "", "")
-	w := windowFlags(fs, defaultGCPTimeout)
-	v := viewFlags(fs)
+	fs, project, w, v := newGCPFlags()
 	rest, code, done := c.parse(fs, args)
 	if done {
 		return code

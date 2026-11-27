@@ -25,6 +25,10 @@ vuln:
 fuzz time="60s":
     go test ./internal/tls/target/ -run '^$' -fuzz FuzzParse -fuzztime {{time}}
 
+# Rewrite manifest.json, the public contract as data, from the code; read the diff.
+manifest:
+    go test ./internal/cli -run '^TestManifest$' -update -count=1
+
 # Run every offline check: formatting, vet, lint, workflow lint, race tests, build and module tidiness.
 check:
     test -z "$(gofmt -l .)"

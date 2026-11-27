@@ -59,15 +59,19 @@ var accessDenied = []string{
 	"ExpiredTokenException",
 }
 
+// newAWSFlags defines the flags of expirely tls aws.
+func newAWSFlags() (fs *flag.FlagSet, profile, region *string, w *window, v *view) {
+	fs = flag.NewFlagSet("expirely tls aws", flag.ContinueOnError)
+	profile = fs.String("profile", "", "")
+	region = fs.String("region", "", "")
+	return fs, profile, region, windowFlags(fs, defaultAWSTimeout), viewFlags(fs)
+}
+
 // runAWS lists the ACM certificates of one account and region and reports
 // them the way a scan reports targets.
 func runAWS(ctx context.Context, args []string, s Streams) int {
 	c := newCommand(s, args, awsUsage)
-	fs := flag.NewFlagSet("expirely tls aws", flag.ContinueOnError)
-	profile := fs.String("profile", "", "")
-	region := fs.String("region", "", "")
-	w := windowFlags(fs, defaultAWSTimeout)
-	v := viewFlags(fs)
+	fs, profile, region, w, v := newAWSFlags()
 	rest, code, done := c.parse(fs, args)
 	if done {
 		return code

@@ -191,8 +191,7 @@ func Run(ctx context.Context, args []string, s Streams) int {
 // goes unless it is a likely typo of a root flag.
 func runRoot(args []string, s Streams) int {
 	c := newCommand(s, args, rootUsage)
-	fs := flag.NewFlagSet("expirely", flag.ContinueOnError)
-	showVersion := fs.Bool("version", false, "")
+	fs, showVersion := newRootFlags()
 	if name := strings.TrimLeft(strings.SplitN(args[0], "=", 2)[0], "-"); !isHelp(args[0]) && name != "json" && fs.Lookup(name) == nil && suggest(fs, name) == "" {
 		return c.fail(failf(CodeInvalidFlag, "unknown flag %s; the flags of a check come after its command, as in %q", args[0], "expirely tls "+args[0]))
 	}
@@ -276,24 +275,50 @@ func isHelp(arg string) bool {
 	return arg == "help" || arg == "-h" || arg == "-help" || arg == "--help"
 }
 
+// newRootFlags defines the flags expirely takes without a command.
+func newRootFlags() (fs *flag.FlagSet, showVersion *bool) {
+	fs = flag.NewFlagSet("expirely", flag.ContinueOnError)
+	return fs, fs.Bool("version", false, "")
+}
+
+// scanFlags are the flags of expirely tls. The flags of every command are
+// defined in one function each, so the manifest test describes the same
+// flags the command parses.
+type scanFlags struct {
+	fs          *flag.FlagSet
+	showVersion *bool
+	w           *window
+	concurrency *int
+	revocation  *bool
+	v           *view
+	files       fileList
+	caFiles     fileList
+}
+
+func newScanFlags() *scanFlags {
+	f := &scanFlags{fs: flag.NewFlagSet("expirely tls", flag.ContinueOnError)}
+	f.showVersion = f.fs.Bool("version", false, "")
+	f.w = windowFlags(f.fs, defaultTimeout)
+	f.concurrency = f.fs.Int("concurrency", defaultConcurrency, "")
+	f.revocation = f.fs.Bool("revocation", false, "")
+	f.v = viewFlags(f.fs)
+	f.fs.BoolVar(&f.v.details, "details", false, "")
+	f.fs.Var(&f.caFiles, "ca-file", "")
+	f.fs.Var(&f.files, "file", "")
+	f.fs.Var(&f.files, "f", "")
+	return f
+}
+
 // runScan probes the targets named in args and in --file.
 func runScan(ctx context.Context, args []string, s Streams) int {
 	c := newCommand(s, args, tlsUsage)
-	fs := flag.NewFlagSet("expirely tls", flag.ContinueOnError)
-	showVersion := fs.Bool("version", false, "")
-	w := windowFlags(fs, defaultTimeout)
-	concurrency := fs.Int("concurrency", defaultConcurrency, "")
-	checkRevocation := fs.Bool("revocation", false, "")
-	v := viewFlags(fs)
-	fs.BoolVar(&v.details, "details", false, "")
-	var files, caFiles fileList
-	fs.Var(&caFiles, "ca-file", "")
-	fs.Var(&files, "file", "")
-	fs.Var(&files, "f", "")
+	f := newScanFlags()
+	fs, showVersion, w, concurrency, checkRevocation, v := f.fs, f.showVersion, f.w, f.concurrency, f.revocation, f.v
 	rest, code, done := c.parse(fs, args)
 	if done {
 		return code
 	}
+	files, caFiles := f.files, f.caFiles
 
 	if *showVersion {
 		if c.json {

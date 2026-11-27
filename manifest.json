@@ -1,0 +1,498 @@
+{
+  "manifest_version": 1,
+  "name": "expirely",
+  "schema_version": 2,
+  "commands": [
+    {
+      "name": "expirely",
+      "summary": "expirely tells you what expires next, before it breaks anything.",
+      "usage": "expirely tells you what expires next, before it breaks anything.\n\nUsage\n  expirely <command> [flags]\n\nCommands\n  tls                     check the certificates TLS endpoints serve\n  tls aws                 list the certificates in AWS Certificate Manager\n  tls gcp                 list the certificates of a Google Cloud project\n  help [COMMAND]          show the help of a command, as in expirely help tls\n\nExamples\n  expirely tls example.com api.example.com:8443\n  expirely tls aws\n  expirely tls gcp\n\nFlags\n      --version           print the version\n      --json              print the version as JSON\n  -h, --help              show this help\n\nEach command lists its own flags with --help, such as expirely tls --help.\n\nDocs: https://github.com/expirely-dev/expirely-cli\n",
+      "flags": [
+        {
+          "name": "version",
+          "short": null,
+          "type": "boolean",
+          "value": null,
+          "default": null,
+          "description": "print the version"
+        },
+        {
+          "name": "json",
+          "short": null,
+          "type": "boolean",
+          "value": null,
+          "default": null,
+          "description": "print the version as JSON"
+        },
+        {
+          "name": "help",
+          "short": "h",
+          "type": "boolean",
+          "value": null,
+          "default": null,
+          "description": "show this help"
+        }
+      ]
+    },
+    {
+      "name": "expirely tls",
+      "summary": "expirely tls checks the certificates TLS endpoints serve and when they expire.",
+      "usage": "expirely tls checks the certificates TLS endpoints serve and when they expire.\n\nUsage\n  expirely tls [flags] TARGET...\n  expirely tls [flags] -f FILE\n  expirely tls aws [flags]\n  expirely tls gcp [flags]\n\nCommands\n  expirely tls aws        list the certificates in AWS Certificate Manager\n  expirely tls gcp        list the certificates of a Google Cloud project\n  expirely tls help       show this help; aws and gcp have their own --help\n\nExamples\n  expirely tls example.com api.example.com:8443\n  expirely tls -f hosts.txt --warn-days 21\n  cat hosts.txt | expirely tls -f - --json | jq .summary\n\nTargets\n  -f, --file PATH         read targets from PATH, one per line; - reads stdin\n  A target is host, host:port, [ipv6]:port or https://host/path.\n  The port defaults to 443.\n\nScan\n      --warn-days N       flag certificates expiring within N days (default 30)\n      --timeout DURATION  time each target has to answer (default 10s)\n      --concurrency N     targets scanned at once (default 16)\n      --ca-file PATH      also trust the CA certificates in this PEM file\n      --revocation        also ask the CA of each trusted certificate whether\n                          it was revoked, by fetching its CRL over HTTP\n\nOutput\n      --json              print JSON; the default when stdout is not a terminal\n      --details           add every certificate of each chain to the JSON\n      --status LIST       show only these statuses, as a comma list: expired,\n                          revoked, expiring, error, unknown, ok, or all (the\n                          default; a declared agent gets all but ok)\n      --fields LIST       keys to keep in each JSON result; target always stays\n      --limit N           show at most N results, most urgent first\n      --version           print the version\n  -h, --help              show this help\n\nEnvironment\n  NO_COLOR=1              text without color\n  EXPIRELY_AGENT=1        report as to an AI agent: JSON and no spinner;\n                          0 turns the detection of agents off\n  EXPIRELY_GITHUB=0       no job summary or annotations in GitHub Actions\n\nExit codes, over every result whatever --status, --fields and --limit show\n  0 all ok, 1 expired, revoked or expiring, 2 usage error, 3 a target could\n  not be read or an end date is unknown, 130 stopped by Ctrl-C\n\nDocs: https://github.com/expirely-dev/expirely-cli\n",
+      "flags": [
+        {
+          "name": "file",
+          "short": "f",
+          "type": "list",
+          "value": "PATH",
+          "default": null,
+          "description": "read targets from PATH, one per line; - reads stdin"
+        },
+        {
+          "name": "warn-days",
+          "short": null,
+          "type": "integer",
+          "value": "N",
+          "default": "30",
+          "description": "flag certificates expiring within N days (default 30)"
+        },
+        {
+          "name": "timeout",
+          "short": null,
+          "type": "duration",
+          "value": "DURATION",
+          "default": "10s",
+          "description": "time each target has to answer (default 10s)"
+        },
+        {
+          "name": "concurrency",
+          "short": null,
+          "type": "integer",
+          "value": "N",
+          "default": "16",
+          "description": "targets scanned at once (default 16)"
+        },
+        {
+          "name": "ca-file",
+          "short": null,
+          "type": "list",
+          "value": "PATH",
+          "default": null,
+          "description": "also trust the CA certificates in this PEM file"
+        },
+        {
+          "name": "revocation",
+          "short": null,
+          "type": "boolean",
+          "value": null,
+          "default": null,
+          "description": "also ask the CA of each trusted certificate whether it was revoked, by fetching its CRL over HTTP"
+        },
+        {
+          "name": "json",
+          "short": null,
+          "type": "boolean",
+          "value": null,
+          "default": null,
+          "description": "print JSON; the default when stdout is not a terminal"
+        },
+        {
+          "name": "details",
+          "short": null,
+          "type": "boolean",
+          "value": null,
+          "default": null,
+          "description": "add every certificate of each chain to the JSON"
+        },
+        {
+          "name": "status",
+          "short": null,
+          "type": "list",
+          "value": "LIST",
+          "default": null,
+          "description": "show only these statuses, as a comma list: expired, revoked, expiring, error, unknown, ok, or all (the default; a declared agent gets all but ok)"
+        },
+        {
+          "name": "fields",
+          "short": null,
+          "type": "list",
+          "value": "LIST",
+          "default": null,
+          "description": "keys to keep in each JSON result; target always stays"
+        },
+        {
+          "name": "limit",
+          "short": null,
+          "type": "integer",
+          "value": "N",
+          "default": null,
+          "description": "show at most N results, most urgent first"
+        },
+        {
+          "name": "version",
+          "short": null,
+          "type": "boolean",
+          "value": null,
+          "default": null,
+          "description": "print the version"
+        },
+        {
+          "name": "help",
+          "short": "h",
+          "type": "boolean",
+          "value": null,
+          "default": null,
+          "description": "show this help"
+        }
+      ]
+    },
+    {
+      "name": "expirely tls aws",
+      "summary": "expirely tls aws lists the certificates in AWS Certificate Manager and when they expire.",
+      "usage": "expirely tls aws lists the certificates in AWS Certificate Manager and when\nthey expire.\n\nUsage\n  expirely tls aws [flags]\n\nExamples\n  expirely tls aws --profile production --region us-east-1\n  expirely tls aws --profile production --region all\n  AWS_PROFILE=production expirely tls aws --region us-east-1,eu-west-1\n\nAWS\n      --profile NAME      profile from the shared AWS config (default\n                          AWS_PROFILE, or the default credential chain)\n      --region REGION     a region, a comma list, or all for every enabled\n                          region (default AWS_REGION or the profile's region)\n\nScan\n      --warn-days N       flag certificates expiring within N days (default 30)\n      --timeout DURATION  time allowed to read ACM (default 30s)\n\nOutput\n      --json              print JSON; the default when stdout is not a terminal\n      --status LIST       show only these statuses, as a comma list: expired,\n                          revoked, expiring, error, unknown, ok, or all (the\n                          default; a declared agent gets all but ok)\n      --fields LIST       keys to keep in each JSON result; target always stays\n      --limit N           show at most N results, most urgent first\n  -h, --help              show this help\n\nexpirely tls aws only calls acm:ListCertificates and\nacm:DescribeCertificate, plus ec2:DescribeRegions for --region all, and\nchanges nothing. A region it cannot read is listed in unreadable, and the run\nexits 3 unless a certificate it read exits 1.\n",
+      "flags": [
+        {
+          "name": "profile",
+          "short": null,
+          "type": "string",
+          "value": "NAME",
+          "default": null,
+          "description": "profile from the shared AWS config (default AWS_PROFILE, or the default credential chain)"
+        },
+        {
+          "name": "region",
+          "short": null,
+          "type": "string",
+          "value": "REGION",
+          "default": null,
+          "description": "a region, a comma list, or all for every enabled region (default AWS_REGION or the profile's region)"
+        },
+        {
+          "name": "warn-days",
+          "short": null,
+          "type": "integer",
+          "value": "N",
+          "default": "30",
+          "description": "flag certificates expiring within N days (default 30)"
+        },
+        {
+          "name": "timeout",
+          "short": null,
+          "type": "duration",
+          "value": "DURATION",
+          "default": "30s",
+          "description": "time allowed to read ACM (default 30s)"
+        },
+        {
+          "name": "json",
+          "short": null,
+          "type": "boolean",
+          "value": null,
+          "default": null,
+          "description": "print JSON; the default when stdout is not a terminal"
+        },
+        {
+          "name": "status",
+          "short": null,
+          "type": "list",
+          "value": "LIST",
+          "default": null,
+          "description": "show only these statuses, as a comma list: expired, revoked, expiring, error, unknown, ok, or all (the default; a declared agent gets all but ok)"
+        },
+        {
+          "name": "fields",
+          "short": null,
+          "type": "list",
+          "value": "LIST",
+          "default": null,
+          "description": "keys to keep in each JSON result; target always stays"
+        },
+        {
+          "name": "limit",
+          "short": null,
+          "type": "integer",
+          "value": "N",
+          "default": null,
+          "description": "show at most N results, most urgent first"
+        },
+        {
+          "name": "help",
+          "short": "h",
+          "type": "boolean",
+          "value": null,
+          "default": null,
+          "description": "show this help"
+        }
+      ]
+    },
+    {
+      "name": "expirely tls gcp",
+      "summary": "expirely tls gcp lists the certificates of a Google Cloud project and when they expire.",
+      "usage": "expirely tls gcp lists the certificates of a Google Cloud project and when\nthey expire.\n\nUsage\n  expirely tls gcp [flags]\n\nExamples\n  expirely tls gcp --project acme-production\n  GOOGLE_CLOUD_PROJECT=acme-production expirely tls gcp --warn-days 21\n\nGoogle Cloud\n      --project ID        project to read (default GOOGLE_CLOUD_PROJECT or\n                          CLOUDSDK_CORE_PROJECT)\n\nScan\n      --warn-days N       flag certificates expiring within N days (default 30)\n      --timeout DURATION  time allowed to read the project (default 30s)\n\nOutput\n      --json              print JSON; the default when stdout is not a terminal\n      --status LIST       show only these statuses, as a comma list: expired,\n                          revoked, expiring, error, unknown, ok, or all (the\n                          default; a declared agent gets all but ok)\n      --fields LIST       keys to keep in each JSON result; target always stays\n      --limit N           show at most N results, most urgent first\n  -h, --help              show this help\n\nexpirely tls gcp signs in with Application Default Credentials, lists the\nCompute SSL certificates with their target proxies and the Certificate\nManager certificates in every location, and changes nothing. A region Google\ncannot reach is listed in unreadable, and the run exits 3 unless a\ncertificate it read exits 1.\n",
+      "flags": [
+        {
+          "name": "project",
+          "short": null,
+          "type": "string",
+          "value": "ID",
+          "default": null,
+          "description": "project to read (default GOOGLE_CLOUD_PROJECT or CLOUDSDK_CORE_PROJECT)"
+        },
+        {
+          "name": "warn-days",
+          "short": null,
+          "type": "integer",
+          "value": "N",
+          "default": "30",
+          "description": "flag certificates expiring within N days (default 30)"
+        },
+        {
+          "name": "timeout",
+          "short": null,
+          "type": "duration",
+          "value": "DURATION",
+          "default": "30s",
+          "description": "time allowed to read the project (default 30s)"
+        },
+        {
+          "name": "json",
+          "short": null,
+          "type": "boolean",
+          "value": null,
+          "default": null,
+          "description": "print JSON; the default when stdout is not a terminal"
+        },
+        {
+          "name": "status",
+          "short": null,
+          "type": "list",
+          "value": "LIST",
+          "default": null,
+          "description": "show only these statuses, as a comma list: expired, revoked, expiring, error, unknown, ok, or all (the default; a declared agent gets all but ok)"
+        },
+        {
+          "name": "fields",
+          "short": null,
+          "type": "list",
+          "value": "LIST",
+          "default": null,
+          "description": "keys to keep in each JSON result; target always stays"
+        },
+        {
+          "name": "limit",
+          "short": null,
+          "type": "integer",
+          "value": "N",
+          "default": null,
+          "description": "show at most N results, most urgent first"
+        },
+        {
+          "name": "help",
+          "short": "h",
+          "type": "boolean",
+          "value": null,
+          "default": null,
+          "description": "show this help"
+        }
+      ]
+    }
+  ],
+  "exit_codes": [
+    {
+      "code": 0,
+      "meaning": "Every result is ok, or --help or --version ran."
+    },
+    {
+      "code": 1,
+      "meaning": "At least one certificate is expired, revoked or expiring."
+    },
+    {
+      "code": 2,
+      "meaning": "Usage error: unknown command, bad flag, invalid target, unreadable --file or no targets."
+    },
+    {
+      "code": 3,
+      "meaning": "At least one target could not be read, an end date is unknown, a cloud command could not read every region, or writing the output failed."
+    },
+    {
+      "code": 130,
+      "meaning": "Stopped by Ctrl-C before the end; no results were printed."
+    }
+  ],
+  "error_codes": [
+    {
+      "code": "aws_access_denied",
+      "exit": 3,
+      "cause": "AWS refused the credentials, they expired, or they lack the ACM read permissions.",
+      "remediation": "The credentials were refused, expired or lack acm:ListCertificates and acm:DescribeCertificate in this account and region, or ec2:DescribeRegions for --region all."
+    },
+    {
+      "code": "aws_not_configured",
+      "exit": 2,
+      "cause": "expirely tls aws found no region in --region, AWS_REGION or the profile, or the profile does not exist in the shared AWS config.",
+      "remediation": "expirely tls aws reads the profile from --profile or AWS_PROFILE and the region from --region, AWS_REGION or that profile, as the AWS CLI does."
+    },
+    {
+      "code": "aws_request_failed",
+      "exit": 3,
+      "cause": "Another AWS failure, such as a timeout or a throttled request.",
+      "remediation": "ACM did not answer as expected; the message has its reason, and a later run or a longer --timeout often succeeds."
+    },
+    {
+      "code": "file_unreadable",
+      "exit": 2,
+      "cause": "A --file could not be opened or read, or has a line over 64 KiB.",
+      "remediation": "A --file needs to exist, be readable and hold one target per line of at most 64 KiB; - reads stdin."
+    },
+    {
+      "code": "gcp_access_denied",
+      "exit": 3,
+      "cause": "Google Cloud refused the credentials, or they lack the Compute or Certificate Manager list permissions.",
+      "remediation": "The credentials were refused or lack compute.sslCertificates.list, compute.targetHttpsProxies.list, compute.targetSslProxies.list, certificatemanager.locations.list or certificatemanager.certs.list in this project."
+    },
+    {
+      "code": "gcp_compute_disabled",
+      "exit": 3,
+      "cause": "The project has the Compute Engine API or billing disabled, so it serves no Compute SSL certificates.",
+      "remediation": "Google Cloud reports the Compute Engine API or billing disabled in this project, so the project serves no Compute SSL certificates."
+    },
+    {
+      "code": "gcp_not_configured",
+      "exit": 2,
+      "cause": "expirely tls gcp found no project, or no Application Default Credentials.",
+      "remediation": "expirely tls gcp reads the project from --project, GOOGLE_CLOUD_PROJECT or CLOUDSDK_CORE_PROJECT and signs in with Application Default Credentials, as gcloud auth application-default login sets up."
+    },
+    {
+      "code": "gcp_request_failed",
+      "exit": 3,
+      "cause": "Another Google Cloud failure, such as a timeout or a server error.",
+      "remediation": "Google Cloud did not answer as expected; the message has its reason, and a later run or a longer --timeout often succeeds."
+    },
+    {
+      "code": "interrupted",
+      "exit": 130,
+      "cause": "The run was stopped, as Ctrl-C does, before it ended; it printed no results, since partial ones would read as complete.",
+      "remediation": "The run was stopped, as Ctrl-C does, before it ended; it printed no results, since partial ones would read as complete."
+    },
+    {
+      "code": "invalid_ca_file",
+      "exit": 2,
+      "cause": "A --ca-file could not be read, holds no PEM certificate, or holds one that does not parse.",
+      "remediation": "A --ca-file is a readable PEM file with one or more CERTIFICATE blocks, such as an internal CA's root."
+    },
+    {
+      "code": "invalid_flag",
+      "exit": 2,
+      "cause": "A flag is unknown or has a value it does not take.",
+      "remediation": "Each command lists every flag and the values it accepts in its --help."
+    },
+    {
+      "code": "invalid_target",
+      "exit": 2,
+      "cause": "A target is not a host, host:port or https:// URL.",
+      "remediation": "A target is host, host:port, [ipv6]:port or https://host/path; the port defaults to 443."
+    },
+    {
+      "code": "missing_arguments",
+      "exit": 2,
+      "cause": "No target was given in the arguments or files.",
+      "remediation": "Targets come as arguments, such as expirely tls example.com, or one per line from --file."
+    },
+    {
+      "code": "output_failed",
+      "exit": 3,
+      "cause": "Writing the result to stdout failed, for example a closed pipe.",
+      "remediation": "The reader of stdout closed before the output ended, as a pipe to head does; the scan itself finished."
+    },
+    {
+      "code": "unexpected_argument",
+      "exit": 2,
+      "cause": "expirely tls aws or expirely tls gcp got an argument that is not a flag, such as a target.",
+      "remediation": "expirely tls aws and expirely tls gcp read a whole account or project and take flags only; targets go to expirely tls."
+    },
+    {
+      "code": "unknown_command",
+      "exit": 2,
+      "cause": "The first argument is not a command, or expirely help got a command there is no help for.",
+      "remediation": "expirely --help lists the commands; checks run under expirely tls, such as expirely tls example.com, expirely tls aws and expirely tls gcp."
+    }
+  ],
+  "result_error_codes": [
+    {
+      "code": "dial_failed",
+      "exit": null,
+      "cause": null,
+      "remediation": "A wrong host or port, a host that is down, or a firewall between this network and the host causes this; reason says which."
+    },
+    {
+      "code": "handshake_failed",
+      "exit": null,
+      "cause": null,
+      "remediation": "The port accepted a connection but did not complete TLS; it may serve plain HTTP, need another port or reject this client; reason says which."
+    }
+  ],
+  "statuses": [
+    {
+      "status": "expired",
+      "exit": 1
+    },
+    {
+      "status": "revoked",
+      "exit": 1
+    },
+    {
+      "status": "expiring",
+      "exit": 1
+    },
+    {
+      "status": "error",
+      "exit": 3
+    },
+    {
+      "status": "unknown",
+      "exit": 3
+    },
+    {
+      "status": "ok",
+      "exit": 0
+    }
+  ],
+  "agent_default_statuses": [
+    "expired",
+    "revoked",
+    "expiring",
+    "error",
+    "unknown"
+  ],
+  "result_fields": [
+    "kind",
+    "source",
+    "target",
+    "status",
+    "days_left",
+    "expires_at",
+    "error",
+    "tls",
+    "acm",
+    "gcp"
+  ],
+  "kinds": [
+    "tls_certificate"
+  ],
+  "sources": [
+    "endpoint",
+    "aws_acm",
+    "gcp"
+  ],
+  "trust_issues": [
+    "expired",
+    "self_signed",
+    "unknown_authority",
+    "name_mismatch",
+    "invalid"
+  ],
+  "revocation_statuses": [
+    "good",
+    "revoked",
+    "unknown"
+  ]
+}
