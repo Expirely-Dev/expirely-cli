@@ -53,12 +53,28 @@ func TestListReadsCertificatesAndTheirProxies(t *testing.T) {
 }
 
 func TestListReturnsAPIErrors(t *testing.T) {
-	svc := service(t, gcptest.Fake{Status: http.StatusForbidden})
+	tests := []struct {
+		reason       string
+		wantDisabled bool
+	}{
+		{reason: "", wantDisabled: false},
+		{reason: "IAM_PERMISSION_DENIED", wantDisabled: false},
+		{reason: "SERVICE_DISABLED", wantDisabled: true},
+		{reason: "BILLING_DISABLED", wantDisabled: true},
+	}
+	for _, tt := range tests {
+		t.Run("reason "+tt.reason, func(t *testing.T) {
+			svc := service(t, gcptest.Fake{Status: http.StatusForbidden, Reason: tt.reason})
 
-	_, err := List(context.Background(), svc, "acme-prod")
+			_, err := List(context.Background(), svc, "acme-prod")
 
-	var apiErr *APIError
-	if !errors.As(err, &apiErr) || apiErr.Code != http.StatusForbidden || apiErr.Message != "refused by the fake" {
-		t.Fatalf("List() error = %v, want a 403 APIError with the server's message", err)
+			var apiErr *APIError
+			if !errors.As(err, &apiErr) || apiErr.Code != http.StatusForbidden || apiErr.Message != "refused by the fake" {
+				t.Fatalf("List() error = %v, want a 403 APIError with the server's message", err)
+			}
+			if apiErr.Reason != tt.reason || apiErr.Disabled() != tt.wantDisabled {
+				t.Errorf("Reason = %q, Disabled() = %v; want %q, %v", apiErr.Reason, apiErr.Disabled(), tt.reason, tt.wantDisabled)
+			}
+		})
 	}
 }

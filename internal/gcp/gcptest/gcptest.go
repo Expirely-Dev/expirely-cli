@@ -4,7 +4,6 @@ package gcptest
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -14,10 +13,12 @@ import (
 // Fake holds the JSON bodies the fake Compute API returns, keyed by the
 // path after the project, such as "aggregated/sslCertificates". A path
 // with no body answers 404. Status, when set, answers every request with
-// that status code and a Google API error body instead.
+// that status code and a Google API error body instead, with Reason as its
+// ErrorInfo reason when Reason is set.
 type Fake struct {
 	Bodies map[string]any
 	Status int
+	Reason string
 }
 
 // Serve starts the fake API for project and returns the endpoint to pass
@@ -27,8 +28,12 @@ func Serve(t testing.TB, project string, f Fake) string {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		if f.Status != 0 {
+			details := []any{}
+			if f.Reason != "" {
+				details = append(details, map[string]any{"@type": "type.googleapis.com/google.rpc.ErrorInfo", "reason": f.Reason, "domain": "googleapis.com"})
+			}
 			w.WriteHeader(f.Status)
-			fmt.Fprintf(w, `{"error":{"code":%d,"message":"refused by the fake"}}`, f.Status)
+			_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]any{"code": f.Status, "message": "refused by the fake", "details": details}})
 			return
 		}
 		prefix := "/compute/v1/projects/" + project + "/"

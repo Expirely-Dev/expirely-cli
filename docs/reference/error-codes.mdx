@@ -34,6 +34,7 @@ Scripts and agents match on `code`; a code is never renamed or reused. Each erro
 | `aws_request_failed` | 3 | Another AWS failure, such as a timeout or a throttled request |
 | `gcp_not_configured` | 2 | `expirely gcp` found no project, or no Application Default Credentials |
 | `gcp_access_denied` | 3 | Google Cloud refused the credentials, or they lack the Compute list permissions |
+| `gcp_compute_disabled` | 3 | The project has the Compute Engine API or billing disabled, so it serves no Compute SSL certificates |
 | `gcp_request_failed` | 3 | Another Google Cloud failure, such as a timeout or a server error |
 | `output_failed` | 3 | Writing the result to stdout failed, for example a closed pipe |
 

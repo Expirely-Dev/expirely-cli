@@ -57,10 +57,20 @@ func NewService(ctx context.Context) (*Service, error) {
 	return &Service{Client: client, Endpoint: DefaultEndpoint}, nil
 }
 
-// APIError is an error response of the Compute API.
+// APIError is an error response of the Compute API. Reason is the first
+// ErrorInfo reason Google gives, such as SERVICE_DISABLED or
+// BILLING_DISABLED, and is empty when it gives none.
 type APIError struct {
 	Code    int
+	Reason  string
 	Message string
+}
+
+// Disabled reports whether the project cannot use Compute Engine at all,
+// because its API or its billing is disabled; such a project has no SSL
+// certificates to list.
+func (e *APIError) Disabled() bool {
+	return e.Reason == "SERVICE_DISABLED" || e.Reason == "BILLING_DISABLED"
 }
 
 func (e *APIError) Error() string {
@@ -232,13 +242,23 @@ func get(ctx context.Context, client *http.Client, u string) ([]byte, error) {
 		var e struct {
 			Error struct {
 				Message string `json:"message"`
+				Details []struct {
+					Reason string `json:"reason"`
+				} `json:"details"`
 			} `json:"error"`
 		}
 		_ = json.Unmarshal(body, &e)
-		if e.Error.Message == "" {
-			e.Error.Message = http.StatusText(resp.StatusCode)
+		apiErr := &APIError{Code: resp.StatusCode, Message: e.Error.Message}
+		if apiErr.Message == "" {
+			apiErr.Message = http.StatusText(resp.StatusCode)
 		}
-		return nil, &APIError{Code: resp.StatusCode, Message: e.Error.Message}
+		for _, d := range e.Error.Details {
+			if d.Reason != "" {
+				apiErr.Reason = d.Reason
+				break
+			}
+		}
+		return nil, apiErr
 	}
 	return body, nil
 }

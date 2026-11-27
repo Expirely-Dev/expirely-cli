@@ -118,11 +118,14 @@ func runGCP(ctx context.Context, args []string, s Streams) int {
 	return exitCode(findings)
 }
 
-// gcpError gives a Google Cloud failure its code: refused credentials or
-// missing permissions are gcp_access_denied, anything else
-// gcp_request_failed.
+// gcpError gives a Google Cloud failure its code: a project with Compute
+// Engine or billing disabled is gcp_compute_disabled, refused credentials or
+// missing permissions gcp_access_denied, anything else gcp_request_failed.
 func gcpError(err error) *Error {
 	var apiErr *gcp.APIError
+	if errors.As(err, &apiErr) && apiErr.Disabled() {
+		return failf(CodeGCPDisabled, "%v", err)
+	}
 	if errors.As(err, &apiErr) && (apiErr.Code == http.StatusUnauthorized || apiErr.Code == http.StatusForbidden) {
 		return failf(CodeGCPAccessDenied, "%v", err)
 	}

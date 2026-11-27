@@ -16,6 +16,7 @@ const (
 	CodeAWSRequestFailed = "aws_request_failed"
 	CodeGCPNotConfigured = "gcp_not_configured"
 	CodeGCPAccessDenied  = "gcp_access_denied"
+	CodeGCPDisabled      = "gcp_compute_disabled"
 	CodeGCPRequestFailed = "gcp_request_failed"
 	CodeOutputFailed     = "output_failed"
 )
@@ -34,6 +35,7 @@ var remediations = map[string]string{
 	CodeAWSRequestFailed: "ACM did not answer as expected; the message has its reason, and a later run or a longer --timeout often succeeds.",
 	CodeGCPNotConfigured: "expirely gcp reads the project from --project, GOOGLE_CLOUD_PROJECT or CLOUDSDK_CORE_PROJECT and signs in with Application Default Credentials, as gcloud auth application-default login sets up.",
 	CodeGCPAccessDenied:  "The credentials were refused or lack compute.sslCertificates.list, compute.targetHttpsProxies.list and compute.targetSslProxies.list in this project.",
+	CodeGCPDisabled:      "Google Cloud reports the Compute Engine API or billing disabled in this project, so the project serves no Compute SSL certificates.",
 	CodeGCPRequestFailed: "Google Cloud did not answer as expected; the message has its reason, and a later run or a longer --timeout often succeeds.",
 	CodeOutputFailed:     "The reader of stdout closed before the output ended, as a pipe to head does; the scan itself finished.",
 }
@@ -50,6 +52,7 @@ var errorCodes = map[string]int{
 	CodeAWSRequestFailed: ExitFailure,
 	CodeGCPNotConfigured: ExitUsage,
 	CodeGCPAccessDenied:  ExitFailure,
+	CodeGCPDisabled:      ExitFailure,
 	CodeGCPRequestFailed: ExitFailure,
 	CodeOutputFailed:     ExitFailure,
 }
