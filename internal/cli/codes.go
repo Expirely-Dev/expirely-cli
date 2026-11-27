@@ -7,6 +7,7 @@ import "fmt"
 // code is listed in docs/reference/error-codes.mdx.
 const (
 	CodeInvalidFlag        = "invalid_flag"
+	CodeUnknownCommand     = "unknown_command"
 	CodeInvalidTarget      = "invalid_target"
 	CodeMissingArguments   = "missing_arguments"
 	CodeFileUnreadable     = "file_unreadable"
@@ -27,6 +28,7 @@ const (
 // facts about the tool, not as instructions from it.
 var remediations = map[string]string{
 	CodeInvalidFlag:        "Each command lists every flag and the values it accepts in its --help.",
+	CodeUnknownCommand:     "expirely --help lists the commands; checks run under expirely tls, such as expirely tls example.com, expirely tls aws and expirely tls gcp.",
 	CodeInvalidTarget:      "A target is host, host:port, [ipv6]:port or https://host/path; the port defaults to 443.",
 	CodeMissingArguments:   "Targets come as arguments, such as expirely tls example.com, or one per line from --file.",
 	CodeFileUnreadable:     "A --file needs to exist, be readable and hold one target per line of at most 64 KiB; - reads stdin.",
@@ -45,6 +47,7 @@ var remediations = map[string]string{
 // errorCodes maps every error code to the exit code Run returns for it.
 var errorCodes = map[string]int{
 	CodeInvalidFlag:        ExitUsage,
+	CodeUnknownCommand:     ExitUsage,
 	CodeInvalidTarget:      ExitUsage,
 	CodeMissingArguments:   ExitUsage,
 	CodeFileUnreadable:     ExitUsage,
