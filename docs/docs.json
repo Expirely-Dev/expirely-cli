@@ -1,7 +1,7 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "almond",
-  "name": "expirely",
+  "name": "expirely CLI",
   "description": "Find every TLS certificate you serve and when it expires.",
   "colors": {
     "primary": "#C2410C",
