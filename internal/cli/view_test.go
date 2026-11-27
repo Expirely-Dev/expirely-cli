@@ -12,10 +12,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/expirely-dev/expirely-cli/internal/gcp"
-	"github.com/expirely-dev/expirely-cli/internal/gcp/gcptest"
-	"github.com/expirely-dev/expirely-cli/internal/scan"
-	"github.com/expirely-dev/expirely-cli/internal/tlstest"
+	"github.com/expirely-dev/expirely-cli/internal/tls/gcp"
+	"github.com/expirely-dev/expirely-cli/internal/tls/gcp/gcptest"
+	"github.com/expirely-dev/expirely-cli/internal/tls/scan"
+	"github.com/expirely-dev/expirely-cli/internal/tls/tlstest"
 )
 
 type viewReport struct {

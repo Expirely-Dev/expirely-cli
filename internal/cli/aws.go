@@ -5,17 +5,15 @@ import (
 	"context"
 	"errors"
 	"flag"
-	"fmt"
 	"regexp"
 	"slices"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/aws/smithy-go"
-	"github.com/expirely-dev/expirely-cli/internal/acm"
-	"github.com/expirely-dev/expirely-cli/internal/scan"
+	"github.com/expirely-dev/expirely-cli/internal/tls/acm"
+	"github.com/expirely-dev/expirely-cli/internal/tls/scan"
 )
 
 const defaultAWSTimeout = 30 * time.Second
@@ -136,7 +134,7 @@ func runAWS(ctx context.Context, args []string, s Streams) int {
 		label = "Reading ACM in " + strconv.Itoa(len(regions)) + " regions"
 	}
 	stop := c.waiting(label)
-	found := readRegions(readCtx, acct, regions)
+	found := acm.ReadRegions(readCtx, acct, regions)
 	stop()
 	if ctx.Err() != nil {
 		return c.interrupted(ctx.Err())
@@ -147,12 +145,12 @@ func runAWS(ctx context.Context, args []string, s Streams) int {
 	unreadable := []string{}
 	var firstErr error
 	for i, f := range found {
-		if f.err != nil {
+		if f.Err != nil {
 			unreadable = append(unreadable, "acm:"+regions[i])
-			firstErr = cmp.Or(firstErr, f.err)
+			firstErr = cmp.Or(firstErr, f.Err)
 			continue
 		}
-		findings = append(findings, acmFindings(f.certs, regions[i], now, w.warn())...)
+		findings = append(findings, acm.Findings(f.Certificates, regions[i], now, w.warn())...)
 	}
 	if len(unreadable) == len(regions) {
 		return c.fail(awsError(firstErr))
@@ -161,10 +159,6 @@ func runAWS(ctx context.Context, args []string, s Streams) int {
 	r.Unreadable = unreadable
 	return c.report(r, time.Since(start))
 }
-
-// regionConcurrency bounds the regions read at once; each region also
-// bounds its own DescribeCertificate calls.
-const regionConcurrency = 8
 
 // regionPattern matches an AWS region name such as us-east-1 or
 // us-gov-west-1.
@@ -193,73 +187,8 @@ func regionList(flagValue string) (regions []string, explicit bool, e *Error) {
 	return regions, true, nil
 }
 
-type regionRead struct {
-	certs []acm.Certificate
-	err   error
-	done  bool
-}
-
-// readRegions lists the certificates of each region, regionConcurrency
-// regions at a time. A region that fails keeps its error and the others
-// go on; the context bounds them all.
-func readRegions(ctx context.Context, acct acm.Account, regions []string) []regionRead {
-	found := make([]regionRead, len(regions))
-	sem := make(chan struct{}, regionConcurrency)
-	var wg sync.WaitGroup
-admit:
-	for i, region := range regions {
-		if ctx.Err() != nil {
-			break
-		}
-		select {
-		case sem <- struct{}{}:
-		case <-ctx.Done():
-			break admit
-		}
-		wg.Go(func() {
-			defer func() { <-sem }()
-			certs, err := acm.List(ctx, acct.Client(region))
-			if err != nil {
-				err = fmt.Errorf("%s: %w", region, err)
-			}
-			found[i] = regionRead{certs: certs, err: err, done: true}
-		})
-	}
-	wg.Wait()
-	for i := range found {
-		if !found[i].done {
-			found[i].err = fmt.Errorf("%s: %w", regions[i], ctx.Err())
-		}
-	}
-	return found
-}
-
-// acmFindings turns ACM certificates into findings. A certificate that was
-// never issued, such as one pending validation, has no end date and is
-// unknown; acm.status says why.
-func acmFindings(certs []acm.Certificate, region string, now time.Time, warn time.Duration) []scan.Finding {
-	findings := make([]scan.Finding, 0, len(certs))
-	for _, cert := range certs {
-		f := scan.Unknown(scan.SourceAWSACM, cert.Domain)
-		if cert.NotAfter != nil {
-			f = scan.Expiry(scan.SourceAWSACM, cert.Domain, *cert.NotAfter, now, warn)
-		}
-		f.ACM = &scan.ACMInfo{
-			ARN:                cert.ARN,
-			Region:             region,
-			Type:               cert.Type,
-			Imported:           cert.Imported(),
-			Status:             cert.Status,
-			RenewalEligibility: cert.RenewalEligibility,
-			InUseBy:            orEmpty(cert.InUseBy),
-		}
-		findings = append(findings, f)
-	}
-	return findings
-}
-
 // orEmpty returns s, or an empty slice for nil, so JSON prints [] rather
-// than null for a certificate nothing uses.
+// than null for a list with nothing in it.
 func orEmpty(s []string) []string {
 	if s == nil {
 		return []string{}

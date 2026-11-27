@@ -14,7 +14,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/expirely-dev/expirely-cli/internal/target"
+	"github.com/expirely-dev/expirely-cli/internal/tls/target"
 )
 
 // Prober reads certificate chains. The zero value verifies against the

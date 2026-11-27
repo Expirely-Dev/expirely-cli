@@ -12,6 +12,7 @@ Rules for agents working in this repository. User documentation is the Mintlify 
 ## Code
 
 - `cmd/expirely` only wires the real streams and signals; behavior lives in `internal/` and is tested through `cli.Run` with a `Streams` value, asserting stdout, stderr and the exit code.
+- Each resource family lives in its own directory under `internal/`: TLS in `internal/tls` (endpoint scan, ACM, Google Cloud, revocation). `internal/cli` holds only routing, flags, error codes and output, and `internal/ui` the text styling.
 - Every network call takes a `context.Context` and has a deadline; concurrent scans run through a bounded pool whose goroutines all end before `Run` returns.
 - Text for a person goes through `internal/ui`: a layout is written once as plain text and styling only wraps words, so a styled render without its escape codes equals the plain render (`TestWriteTextStyledIsPlainPlusEscapes`), and text from certificates or peers passes through `ui.Clean`. The text output's golden file is `internal/cli/testdata/text.golden`; regenerate it with `go test ./internal/cli -run TestWriteTextGolden -update` and read the diff.
 - The tool reads certificates and nothing else: it never writes to a target, never sends credentials, and never handles private keys.

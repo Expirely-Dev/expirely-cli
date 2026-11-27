@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/expirely-dev/expirely-cli/internal/scan"
+	"github.com/expirely-dev/expirely-cli/internal/tls/scan"
 	"github.com/expirely-dev/expirely-cli/internal/ui"
 )
 

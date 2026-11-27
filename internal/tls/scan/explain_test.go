@@ -13,9 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/expirely-dev/expirely-cli/internal/probe"
-	"github.com/expirely-dev/expirely-cli/internal/target"
-	"github.com/expirely-dev/expirely-cli/internal/tlstest"
+	"github.com/expirely-dev/expirely-cli/internal/tls/probe"
+	"github.com/expirely-dev/expirely-cli/internal/tls/target"
+	"github.com/expirely-dev/expirely-cli/internal/tls/tlstest"
 )
 
 func TestReason(t *testing.T) {

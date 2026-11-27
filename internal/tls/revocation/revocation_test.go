@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/expirely-dev/expirely-cli/internal/tlstest"
+	"github.com/expirely-dev/expirely-cli/internal/tls/tlstest"
 )
 
 func serveCRL(t *testing.T, body []byte, requests *atomic.Int32) string {

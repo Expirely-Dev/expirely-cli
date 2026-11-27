@@ -11,9 +11,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/expirely-dev/expirely-cli/internal/probe"
-	"github.com/expirely-dev/expirely-cli/internal/revocation"
-	"github.com/expirely-dev/expirely-cli/internal/target"
+	"github.com/expirely-dev/expirely-cli/internal/tls/probe"
+	"github.com/expirely-dev/expirely-cli/internal/tls/revocation"
+	"github.com/expirely-dev/expirely-cli/internal/tls/target"
 )
 
 // Status is the expiry state of one target.
