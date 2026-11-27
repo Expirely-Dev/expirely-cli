@@ -93,7 +93,7 @@ jobs:
           app-id: ${{ secrets.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
           owner: expirely-dev
-          repositories: expirely-action
+          repositories: action
           permission-actions: write
       - name: Ask the action to make this release its default
         env:
@@ -101,5 +101,5 @@ jobs:
           TAG: ${{ needs.release-please.outputs.tag }}
           REVIEWER: ${{ github.actor }}
         run: |
-          gh workflow run bump-cli.yml --repo expirely-dev/expirely-action \
+          gh workflow run bump-cli.yml --repo expirely-dev/action \
             --field version="$TAG" --field reviewer="$REVIEWER"

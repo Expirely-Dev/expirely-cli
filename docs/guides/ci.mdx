@@ -7,7 +7,7 @@ expirely exits with `1` when any certificate is expired or expires within `--war
 
 ## GitHub Actions
 
-[expirely-dev/expirely-action](https://github.com/expirely-dev/expirely-action) installs a pinned expirely, checks the archive against its SHA-256 and runs it:
+[expirely-dev/action](https://github.com/expirely-dev/action) installs a pinned expirely, checks the archive against its SHA-256 and runs it:
 
 ```yaml .github/workflows/certificates.yml
 name: certificates
@@ -25,7 +25,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: expirely-dev/expirely-action@v2
+      - uses: expirely-dev/action@v2
         with:
           targets: |
             example.com
