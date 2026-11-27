@@ -145,7 +145,8 @@ func (c *command) writeJSON(v any) int {
 // returns the exit code every result calls for, shown or not: --status,
 // --limit and --fields change what is printed, never what fails. A report
 // with places it could not read is incomplete, so it exits as a result
-// that could not be read does; text names those places on stderr.
+// that could not be read does; text names those places on stderr. In a
+// GitHub Actions workflow it also writes the job summary and annotations.
 func (c *command) report(r report, elapsed time.Duration) int {
 	if c.json {
 		if code := c.writeJSON(r); code != ExitOK {
@@ -157,6 +158,7 @@ func (c *command) report(r report, elapsed time.Duration) int {
 			fmt.Fprintf(c.Stderr, "expirely: could not read %s; certificates kept there are missing from these results\n", ui.Clean(strings.Join(r.Unreadable, ", ")))
 		}
 	}
+	c.github(r)
 	code := exitCode(r.all)
 	if code == ExitOK && len(r.Unreadable) > 0 {
 		return ExitFailure

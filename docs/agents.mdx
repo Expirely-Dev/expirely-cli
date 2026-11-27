@@ -68,4 +68,4 @@ Every error also carries a `remediation`: what resolves it, stated as a fact abo
 
 ## Safe to run
 
-expirely only reads. It completes a TLS handshake and closes the connection, sends no application data and no credentials, and removes control characters from text taken from certificates before printing it in a terminal. Its progress spinners, in a scan and while `expirely aws` or `expirely gcp` reads, are drawn only when stderr is a terminal, so a program reading stderr gets errors and nothing else.
+expirely only reads. It completes a TLS handshake and closes the connection, sends no application data and no credentials, and removes control characters from text taken from certificates before printing it in a terminal. Its progress spinners, in a scan and while `expirely aws` or `expirely gcp` reads, are drawn only when stderr is a terminal, so a program reading stderr gets errors and nothing else. The one exception is a GitHub Actions workflow, where stderr also carries the annotation commands the runner turns into annotations.

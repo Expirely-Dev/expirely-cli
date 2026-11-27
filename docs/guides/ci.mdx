@@ -7,7 +7,7 @@ expirely exits with `1` when any certificate is expired or expires within `--war
 
 ## GitHub Actions
 
-[bycavii/expirely-action](https://github.com/bycavii/expirely-action) installs expirely, checks the archive against its checksum and build provenance, and fails the step when a certificate expires within 30 days. It writes a job summary and annotates each certificate that needs attention.
+[bycavii/expirely-action](https://github.com/bycavii/expirely-action) installs a pinned expirely, checks the archive against its SHA-256 and runs it:
 
 ```yaml .github/workflows/certificates.yml
 name: certificates
@@ -25,16 +25,20 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
       - uses: bycavii/expirely-action@v1
         with:
-          targets-file: targets.txt
-          warn-days: 21
+          targets: |
+            example.com
+            api.example.com:8443
 ```
 
-The action's README covers its inputs, its outputs, opening an issue from a schedule, and reading AWS or Google Cloud. Without the action, install the binary and run it like any other command:
+Inside a workflow, expirely itself adds to the run, with or without the action:
+
+- A job summary with a table of every certificate that needs attention, most urgent first, or the one that expires first when all are ok.
+- An annotation per certificate that needs attention: an error for `expired` and `error`, a warning for `expiring`. GitHub shows 10 of each kind per step, so expirely writes the most urgent 10 and a notice counting the rest.
+- The step fails on exit code `1` or `3`, like any command. To report without failing, add `continue-on-error: true` to the step.
+
+The summary and annotations cover every result, whatever `--status`, `--fields` and `--limit` show. `EXPIRELY_GITHUB=0` turns them off. Without the action, install the binary and run it like any other command:
 
 ```yaml
       - run: go install github.com/bycavii/expirely-cli/cmd/expirely@latest
