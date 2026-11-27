@@ -4,15 +4,12 @@ import (
 	"context"
 	"errors"
 	"flag"
-	"fmt"
-	"io"
 	"slices"
 	"time"
 
 	"github.com/aws/smithy-go"
 	"github.com/bycavii/expirely-cli/internal/acm"
 	"github.com/bycavii/expirely-cli/internal/scan"
-	"github.com/bycavii/expirely-cli/internal/ui"
 )
 
 const defaultAWSTimeout = 30 * time.Second
@@ -54,44 +51,22 @@ var accessDenied = []string{
 // runAWS lists the ACM certificates of one account and region and reports
 // them the way a scan reports targets.
 func runAWS(ctx context.Context, args []string, s Streams) int {
-	ag := detectAgent(s.Getenv, s.StdoutIsTerminal)
-	if ag.Name != "" {
-		s.Style = ui.Style{}
-	}
-	jsonOut := !s.StdoutIsTerminal || ag.Declared || wantsJSON(args)
-	out := func() mode { return mode{json: jsonOut, agent: ag.Name != ""} }
-
+	c := newCommand(s, args, awsUsage)
 	fs := flag.NewFlagSet("expirely aws", flag.ContinueOnError)
-	fs.SetOutput(io.Discard)
-	jsonFlag := fs.Bool("json", false, "")
 	profile := fs.String("profile", "", "")
 	region := fs.String("region", "", "")
-	warnDays := fs.Int("warn-days", defaultWarnDays, "")
-	timeout := fs.Duration("timeout", defaultAWSTimeout, "")
-
-	if err := fs.Parse(args); err != nil {
-		if errors.Is(err, flag.ErrHelp) {
-			fmt.Fprint(s.Stdout, awsUsage)
-			return ExitOK
-		}
-		return fail(s, out(), failf(CodeInvalidFlag, "%s", flagError(err)))
+	w := windowFlags(fs, defaultAWSTimeout)
+	if code, done := c.parse(fs, args); done {
+		return code
 	}
-	fs.Visit(func(f *flag.Flag) {
-		if f.Name == "json" {
-			jsonOut = *jsonFlag
-		}
-	})
 	if fs.NArg() > 0 {
-		return fail(s, out(), failf(CodeInvalidFlag, "expirely aws takes no targets, got %q", fs.Arg(0)))
+		return c.fail(failf(CodeInvalidFlag, "expirely aws takes no targets, got %q", fs.Arg(0)))
 	}
-	if *warnDays < 0 {
-		return fail(s, out(), failf(CodeInvalidFlag, "--warn-days must be 0 or more, got %d", *warnDays))
-	}
-	if *timeout <= 0 {
-		return fail(s, out(), failf(CodeInvalidFlag, "--timeout must be positive, got %s", *timeout))
+	if e := w.check(); e != nil {
+		return c.fail(e)
 	}
 
-	newACM := s.NewACM
+	newACM := c.NewACM
 	if newACM == nil {
 		newACM = func(ctx context.Context, profile, region string) (acm.API, string, error) {
 			return acm.NewClient(ctx, profile, region)
@@ -99,31 +74,56 @@ func runAWS(ctx context.Context, args []string, s Streams) int {
 	}
 	client, resolved, err := newACM(ctx, *profile, *region)
 	if err != nil {
-		return fail(s, out(), failf(CodeAWSNotConfigured, "%v", err))
+		return c.fail(failf(CodeAWSNotConfigured, "%v", err))
 	}
 	if resolved == "" {
-		return fail(s, out(), failf(CodeAWSNotConfigured, "no AWS region: none in --region, AWS_REGION or the profile"))
+		return c.fail(failf(CodeAWSNotConfigured, "no AWS region: none in --region, AWS_REGION or the profile"))
 	}
 
 	start := time.Now()
-	readCtx, cancel := context.WithTimeout(ctx, *timeout)
+	readCtx, cancel := context.WithTimeout(ctx, w.timeout)
 	certs, err := acm.List(readCtx, client)
 	cancel()
+	if ctx.Err() != nil {
+		return c.interrupted(ctx.Err())
+	}
 	if err != nil {
-		return fail(s, out(), awsError(err))
+		return c.fail(awsError(err))
 	}
-
 	now := time.Now()
-	findings := scan.FromACM(certs, now, time.Duration(*warnDays)*24*time.Hour)
-	report := newReport(now, *warnDays, findings, false)
-	if jsonOut {
-		if code := writeJSON(s, out(), report); code != ExitOK {
-			return code
+	return c.report(newReport(now, w.warnDays, acmFindings(certs, now, w.warn()), false), time.Since(start))
+}
+
+// acmFindings turns ACM certificates into findings. A certificate that was
+// never issued, such as one pending validation, has no end date and is left
+// out.
+func acmFindings(certs []acm.Certificate, now time.Time, warn time.Duration) []scan.Finding {
+	findings := make([]scan.Finding, 0, len(certs))
+	for _, cert := range certs {
+		if cert.NotAfter == nil {
+			continue
 		}
-	} else {
-		writeText(s.Style.Writer(s.Stdout), s.Style, report, time.Since(start))
+		f := scan.Expiry(cert.Domain, *cert.NotAfter, now, warn)
+		f.ACM = &scan.ACMInfo{
+			ARN:                cert.ARN,
+			Type:               cert.Type,
+			Imported:           cert.Imported(),
+			Status:             cert.Status,
+			RenewalEligibility: cert.RenewalEligibility,
+			InUseBy:            orEmpty(cert.InUseBy),
+		}
+		findings = append(findings, f)
 	}
-	return exitCode(findings)
+	return findings
+}
+
+// orEmpty returns s, or an empty slice for nil, so JSON prints [] rather
+// than null for a certificate nothing uses.
+func orEmpty(s []string) []string {
+	if s == nil {
+		return []string{}
+	}
+	return s
 }
 
 // awsError gives an AWS failure its code: refused credentials or missing

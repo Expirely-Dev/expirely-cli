@@ -8,9 +8,11 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/bycavii/expirely-cli/internal/gcp"
 	"github.com/bycavii/expirely-cli/internal/gcp/gcptest"
+	"github.com/bycavii/expirely-cli/internal/scan"
 )
 
 func runGCPWith(t *testing.T, terminal bool, f gcptest.Fake, env map[string]string, args ...string) (code int, stdout, stderr string) {
@@ -86,8 +88,8 @@ func TestGCPErrors(t *testing.T) {
 	}{
 		{name: "no project", f: gcptest.Fake{Bodies: gcptest.Sample("acme-prod")}, wantCode: ExitUsage, wantErr: CodeGCPNotConfigured},
 		{name: "permission denied", f: gcptest.Fake{Status: http.StatusForbidden, Reason: "IAM_PERMISSION_DENIED"}, args: []string{"--project", "acme-prod"}, wantCode: ExitFailure, wantErr: CodeGCPAccessDenied},
-		{name: "compute api disabled", f: gcptest.Fake{Status: http.StatusForbidden, Reason: "SERVICE_DISABLED"}, args: []string{"--project", "acme-prod"}, wantCode: ExitFailure, wantErr: CodeGCPDisabled},
-		{name: "billing disabled", f: gcptest.Fake{Status: http.StatusForbidden, Reason: "BILLING_DISABLED"}, args: []string{"--project", "acme-prod"}, wantCode: ExitFailure, wantErr: CodeGCPDisabled},
+		{name: "compute api disabled", f: gcptest.Fake{Status: http.StatusForbidden, Reason: "SERVICE_DISABLED"}, args: []string{"--project", "acme-prod"}, wantCode: ExitFailure, wantErr: CodeGCPComputeDisabled},
+		{name: "billing disabled", f: gcptest.Fake{Status: http.StatusForbidden, Reason: "BILLING_DISABLED"}, args: []string{"--project", "acme-prod"}, wantCode: ExitFailure, wantErr: CodeGCPComputeDisabled},
 		{name: "server error", f: gcptest.Fake{Status: http.StatusInternalServerError}, args: []string{"--project", "acme-prod", "--timeout", "2s"}, wantCode: ExitFailure, wantErr: CodeGCPRequestFailed},
 		{name: "targets are not accepted", f: gcptest.Fake{}, args: []string{"--project", "acme-prod", "example.com"}, wantCode: ExitUsage, wantErr: CodeInvalidFlag},
 	}
@@ -123,5 +125,24 @@ func TestGCPClientError(t *testing.T) {
 	var env envelope
 	if code != ExitUsage || json.Unmarshal(errOut.Bytes(), &env) != nil || env.Error.Code != CodeGCPNotConfigured {
 		t.Errorf("exit code = %d, stderr = %s; want %d and %q", code, errOut.String(), ExitUsage, CodeGCPNotConfigured)
+	}
+}
+
+func TestGCPFindings(t *testing.T) {
+	day := 24 * time.Hour
+	now := time.Date(2026, 11, 26, 12, 0, 0, 0, time.UTC)
+	soon := now.Add(12 * day)
+	certs := []gcp.Certificate{
+		{Name: "api-cert", Domain: "api.example.com", Location: "global", NotAfter: &soon},
+		{Name: "pending", Domain: "new.example.com", Location: "global", Managed: true},
+	}
+
+	got := gcpFindings(certs, now, 30*day)
+
+	if len(got) != 1 {
+		t.Fatalf("len(findings) = %d, want 1; a certificate not issued yet has no end date", len(got))
+	}
+	if f := got[0]; f.Target != "api.example.com" || f.Status != scan.StatusExpiring || f.GCP.Managed || f.GCP.InUseBy == nil || f.Trusted != nil {
+		t.Errorf("findings[0] = %+v, gcp = %+v; want an expiring self-managed certificate, an empty in_use_by and no trust fields", f, f.GCP)
 	}
 }

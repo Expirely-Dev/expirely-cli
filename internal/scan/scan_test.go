@@ -126,7 +126,10 @@ func TestScan(t *testing.T) {
 		},
 	}
 
-	got := Scan(context.Background(), p, []target.Target{ok, down, bad}, Options{Warn: 30 * 24 * time.Hour, Timeout: time.Second, Now: now})
+	got, err := Scan(context.Background(), p, []target.Target{ok, down, bad}, Options{Warn: 30 * 24 * time.Hour, Timeout: time.Second, Now: now})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	want := []struct {
 		target, code string
@@ -189,7 +192,10 @@ func TestScanBoundsConcurrencyAndKeepsOrder(t *testing.T) {
 	p := &slowProber{}
 
 	var progress atomic.Int32
-	got := Scan(context.Background(), p, targets, Options{Warn: 0, Timeout: time.Second, Now: now, Concurrency: limit, Progress: func() { progress.Add(1) }})
+	got, err := Scan(context.Background(), p, targets, Options{Warn: 0, Timeout: time.Second, Now: now, Concurrency: limit, Progress: func() { progress.Add(1) }})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if n := int(progress.Load()); n != len(targets) {
 		t.Errorf("Progress called %d times, want once per target (%d)", n, len(targets))
@@ -215,9 +221,66 @@ func TestScanConcurrencyBelowOne(t *testing.T) {
 	p := &slowProber{}
 	targets := []target.Target{{Host: "a.example", Port: 1}, {Host: "b.example", Port: 2}}
 
-	got := Scan(context.Background(), p, targets, Options{Timeout: time.Second, Now: now, Concurrency: 0})
+	got, err := Scan(context.Background(), p, targets, Options{Timeout: time.Second, Now: now, Concurrency: 0})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if len(got) != 2 || p.peak.Load() != 1 {
 		t.Errorf("len(findings) = %d, peak = %d, want 2 findings probed one at a time", len(got), p.peak.Load())
+	}
+}
+
+type countingProber struct{ calls atomic.Int32 }
+
+func (p *countingProber) Probe(ctx context.Context, t target.Target) (probe.Result, error) {
+	p.calls.Add(1)
+	<-ctx.Done()
+	return probe.Result{}, &probe.Error{Target: t, Op: "dial", Err: ctx.Err()}
+}
+
+func TestScanStopsWhenCanceled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	p := &countingProber{}
+	targets := make([]target.Target, 50)
+	for i := range targets {
+		targets[i] = target.Target{Host: "t.example", Port: i + 1}
+	}
+	cancel()
+
+	got, err := Scan(ctx, p, targets, Options{Timeout: time.Second, Now: now, Concurrency: 2})
+
+	if !errors.Is(err, context.Canceled) || got != nil {
+		t.Errorf("Scan() = %d findings, %v; want none and context.Canceled", len(got), err)
+	}
+	if n := p.calls.Load(); n != 0 {
+		t.Errorf("Scan probed %d targets after its context was canceled, want 0", n)
+	}
+}
+
+func TestExpiry(t *testing.T) {
+	day := 24 * time.Hour
+	tests := []struct {
+		name     string
+		notAfter time.Time
+		want     Status
+		wantDays int
+	}{
+		{name: "ends now", notAfter: now, want: StatusExpired, wantDays: 0},
+		{name: "ended a day and an hour ago", notAfter: now.Add(-day - time.Hour), want: StatusExpired, wantDays: -2},
+		{name: "inside the window", notAfter: now.Add(12 * day), want: StatusExpiring, wantDays: 12},
+		{name: "on the window's edge", notAfter: now.Add(30 * day), want: StatusOK, wantDays: 30},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Expiry("api.example.com", tt.notAfter, now, 30*day)
+
+			if got.Target != "api.example.com" || got.Status != tt.want || *got.DaysLeft != tt.wantDays || !got.ExpiresAt.Equal(tt.notAfter) {
+				t.Errorf("Expiry() = %s %s %d days %v, want %s %d days", got.Target, got.Status, *got.DaysLeft, got.ExpiresAt, tt.want, tt.wantDays)
+			}
+			if got.Trusted != nil || got.Leaf != nil || got.Chain != nil || got.Error != nil {
+				t.Errorf("Expiry() = %+v, want no trust, leaf, chain or error", got)
+			}
+		})
 	}
 }

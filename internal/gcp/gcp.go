@@ -101,16 +101,10 @@ func List(ctx context.Context, svc *Service, project string) ([]Certificate, err
 		return nil, err
 	}
 	var certs []Certificate
-	err = pages(ctx, svc, project, "aggregated/sslCertificates", func(body []byte) error {
-		var page struct {
-			Items map[string]struct {
-				SslCertificates []sslCertificate `json:"sslCertificates"`
-			} `json:"items"`
-		}
-		if err := json.Unmarshal(body, &page); err != nil {
-			return err
-		}
-		for scope, list := range page.Items {
+	err = list(ctx, svc, project, "aggregated/sslCertificates", func(scopes map[string]struct {
+		SslCertificates []sslCertificate `json:"sslCertificates"`
+	}) error {
+		for scope, list := range scopes {
 			for _, c := range list.SslCertificates {
 				cert, err := fromCompute(c, scope)
 				if err != nil {
@@ -162,31 +156,19 @@ func proxyUsers(ctx context.Context, svc *Service, project string) (map[string][
 			}
 		}
 	}
-	err := pages(ctx, svc, project, "aggregated/targetHttpsProxies", func(body []byte) error {
-		var page struct {
-			Items map[string]struct {
-				TargetHTTPSProxies []proxy `json:"targetHttpsProxies"`
-			} `json:"items"`
-		}
-		if err := json.Unmarshal(body, &page); err != nil {
-			return err
-		}
-		for _, list := range page.Items {
-			add(list.TargetHTTPSProxies)
+	err := list(ctx, svc, project, "aggregated/targetHttpsProxies", func(scopes map[string]struct {
+		TargetHTTPSProxies []proxy `json:"targetHttpsProxies"`
+	}) error {
+		for _, l := range scopes {
+			add(l.TargetHTTPSProxies)
 		}
 		return nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("list target HTTPS proxies: %w", err)
 	}
-	err = pages(ctx, svc, project, "global/targetSslProxies", func(body []byte) error {
-		var page struct {
-			Items []proxy `json:"items"`
-		}
-		if err := json.Unmarshal(body, &page); err != nil {
-			return err
-		}
-		add(page.Items)
+	err = list(ctx, svc, project, "global/targetSslProxies", func(proxies []proxy) error {
+		add(proxies)
 		return nil
 	})
 	if err != nil {
@@ -195,12 +177,19 @@ func proxyUsers(ctx context.Context, svc *Service, project string) (map[string][
 	return users, nil
 }
 
-// pages calls the list method at path for project, once per page, and
-// hands each response body to fn.
-func pages(ctx context.Context, svc *Service, project, path string, fn func(body []byte) error) error {
-	token := ""
-	for {
-		u := strings.TrimSuffix(svc.Endpoint, "/") + "/projects/" + url.PathEscape(project) + "/" + path
+// page is one response of a Compute list method: Items is a list for a
+// global method and a map from scope to list for an aggregated one.
+type page[T any] struct {
+	Items         T      `json:"items"`
+	NextPageToken string `json:"nextPageToken"`
+}
+
+// list calls the list method at path for project, once per page, and hands
+// each page's items to each.
+func list[T any](ctx context.Context, svc *Service, project, path string, each func(T) error) error {
+	base := strings.TrimSuffix(svc.Endpoint, "/") + "/projects/" + url.PathEscape(project) + "/" + path
+	for token := ""; ; {
+		u := base
 		if token != "" {
 			u += "?pageToken=" + url.QueryEscape(token)
 		}
@@ -208,19 +197,17 @@ func pages(ctx context.Context, svc *Service, project, path string, fn func(body
 		if err != nil {
 			return err
 		}
-		if err := fn(body); err != nil {
+		var p page[T]
+		if err := json.Unmarshal(body, &p); err != nil {
 			return fmt.Errorf("read %s: %w", path, err)
 		}
-		var next struct {
-			NextPageToken string `json:"nextPageToken"`
-		}
-		if err := json.Unmarshal(body, &next); err != nil {
+		if err := each(p.Items); err != nil {
 			return fmt.Errorf("read %s: %w", path, err)
 		}
-		if next.NextPageToken == "" {
+		if p.NextPageToken == "" {
 			return nil
 		}
-		token = next.NextPageToken
+		token = p.NextPageToken
 	}
 }
 

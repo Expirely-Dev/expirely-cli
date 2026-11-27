@@ -70,4 +70,4 @@ Text taken from certificates and errors has its control characters removed befor
 
 ## Exit codes
 
-`0` when every target is `ok`, `1` when a certificate is `expired` or `expiring`, `2` for a usage error and `3` when a target could not be read. `1` wins over `3`. Each code is in [Error codes](/reference/error-codes).
+`0` when every target is `ok`, `1` when a certificate is `expired` or `expiring`, `2` for a usage error, `3` when a target could not be read and `130` when Ctrl-C stopped the scan, which then prints no results. `1` wins over `3`. A second Ctrl-C ends expirely at once. Each code is in [Error codes](/reference/error-codes).

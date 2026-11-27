@@ -13,6 +13,7 @@ When a scan has several outcomes, 1 wins over 3.
 | 1 | At least one certificate is `expired` or `expiring` |
 | 2 | Usage error: bad flag, invalid target, unreadable `--file` or no targets |
 | 3 | At least one target could not be read, or writing the output failed |
+| 130 | Stopped by Ctrl-C before the end; no results were printed |
 
 ## Error codes
 
@@ -36,6 +37,7 @@ Scripts and agents match on `code`; a code is never renamed or reused. Each erro
 | `gcp_access_denied` | 3 | Google Cloud refused the credentials, or they lack the Compute list permissions |
 | `gcp_compute_disabled` | 3 | The project has the Compute Engine API or billing disabled, so it serves no Compute SSL certificates |
 | `gcp_request_failed` | 3 | Another Google Cloud failure, such as a timeout or a server error |
+| `interrupted` | 130 | The run was stopped, as Ctrl-C does, before it ended; it printed no results, since partial ones would read as complete |
 | `output_failed` | 3 | Writing the result to stdout failed, for example a closed pipe |
 
 A target that could not be read is a result, not a command error: its `status` is `error` and its `error.code` is one of these.

@@ -68,12 +68,14 @@ func (s Style) Good(text string) string { return s.apply(green, text) }
 // Note marks a remark a person should read, such as a trust problem.
 func (s Style) Note(text string) string { return s.apply(warn, text) }
 
-// Clean removes control characters from text that came from outside
-// expirely, such as a certificate field or an error from a peer, so it
-// cannot move the cursor, recolor the terminal or change its title.
+// Clean removes control and format characters from text that came from
+// outside expirely, such as a certificate field or an error from a peer, so
+// it cannot move the cursor, recolor the terminal or change its title, and
+// cannot reorder what a person reads with bidirectional overrides such as
+// U+202E or hide text with zero-width characters.
 func Clean(text string) string {
 	return strings.Map(func(r rune) rune {
-		if unicode.IsControl(r) {
+		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) {
 			return -1
 		}
 		return r

@@ -1,17 +1,15 @@
 package cli
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"flag"
-	"fmt"
-	"io"
 	"net/http"
 	"time"
 
 	"github.com/bycavii/expirely-cli/internal/gcp"
 	"github.com/bycavii/expirely-cli/internal/scan"
-	"github.com/bycavii/expirely-cli/internal/ui"
 )
 
 const defaultGCPTimeout = 30 * time.Second
@@ -43,79 +41,62 @@ certificates and target proxies, and changes nothing.
 // runGCP lists the SSL certificates of one Google Cloud project and reports
 // them the way a scan reports targets.
 func runGCP(ctx context.Context, args []string, s Streams) int {
-	ag := detectAgent(s.Getenv, s.StdoutIsTerminal)
-	if ag.Name != "" {
-		s.Style = ui.Style{}
-	}
-	jsonOut := !s.StdoutIsTerminal || ag.Declared || wantsJSON(args)
-	out := func() mode { return mode{json: jsonOut, agent: ag.Name != ""} }
-
+	c := newCommand(s, args, gcpUsage)
 	fs := flag.NewFlagSet("expirely gcp", flag.ContinueOnError)
-	fs.SetOutput(io.Discard)
-	jsonFlag := fs.Bool("json", false, "")
 	project := fs.String("project", "", "")
-	warnDays := fs.Int("warn-days", defaultWarnDays, "")
-	timeout := fs.Duration("timeout", defaultGCPTimeout, "")
-
-	if err := fs.Parse(args); err != nil {
-		if errors.Is(err, flag.ErrHelp) {
-			fmt.Fprint(s.Stdout, gcpUsage)
-			return ExitOK
-		}
-		return fail(s, out(), failf(CodeInvalidFlag, "%s", flagError(err)))
+	w := windowFlags(fs, defaultGCPTimeout)
+	if code, done := c.parse(fs, args); done {
+		return code
 	}
-	fs.Visit(func(f *flag.Flag) {
-		if f.Name == "json" {
-			jsonOut = *jsonFlag
-		}
-	})
 	if fs.NArg() > 0 {
-		return fail(s, out(), failf(CodeInvalidFlag, "expirely gcp takes no targets, got %q", fs.Arg(0)))
+		return c.fail(failf(CodeInvalidFlag, "expirely gcp takes no targets, got %q", fs.Arg(0)))
 	}
-	if *warnDays < 0 {
-		return fail(s, out(), failf(CodeInvalidFlag, "--warn-days must be 0 or more, got %d", *warnDays))
+	if e := w.check(); e != nil {
+		return c.fail(e)
 	}
-	if *timeout <= 0 {
-		return fail(s, out(), failf(CodeInvalidFlag, "--timeout must be positive, got %s", *timeout))
-	}
-	if *project == "" && s.Getenv != nil {
-		*project = s.Getenv("GOOGLE_CLOUD_PROJECT")
-		if *project == "" {
-			*project = s.Getenv("CLOUDSDK_CORE_PROJECT")
-		}
+	if *project == "" && c.Getenv != nil {
+		*project = cmp.Or(c.Getenv("GOOGLE_CLOUD_PROJECT"), c.Getenv("CLOUDSDK_CORE_PROJECT"))
 	}
 	if *project == "" {
-		return fail(s, out(), failf(CodeGCPNotConfigured, "no Google Cloud project: none in --project, GOOGLE_CLOUD_PROJECT or CLOUDSDK_CORE_PROJECT"))
+		return c.fail(failf(CodeGCPNotConfigured, "no Google Cloud project: none in --project, GOOGLE_CLOUD_PROJECT or CLOUDSDK_CORE_PROJECT"))
 	}
 
-	newGCP := s.NewGCP
+	newGCP := c.NewGCP
 	if newGCP == nil {
 		newGCP = gcp.NewService
 	}
 	svc, err := newGCP(ctx)
 	if err != nil {
-		return fail(s, out(), failf(CodeGCPNotConfigured, "%v", err))
+		return c.fail(failf(CodeGCPNotConfigured, "%v", err))
 	}
 
 	start := time.Now()
-	readCtx, cancel := context.WithTimeout(ctx, *timeout)
+	readCtx, cancel := context.WithTimeout(ctx, w.timeout)
 	certs, err := gcp.List(readCtx, svc, *project)
 	cancel()
+	if ctx.Err() != nil {
+		return c.interrupted(ctx.Err())
+	}
 	if err != nil {
-		return fail(s, out(), gcpError(err))
+		return c.fail(gcpError(err))
 	}
-
 	now := time.Now()
-	findings := scan.FromGCP(certs, now, time.Duration(*warnDays)*24*time.Hour)
-	report := newReport(now, *warnDays, findings, false)
-	if jsonOut {
-		if code := writeJSON(s, out(), report); code != ExitOK {
-			return code
+	return c.report(newReport(now, w.warnDays, gcpFindings(certs, now, w.warn()), false), time.Since(start))
+}
+
+// gcpFindings turns a project's SSL certificates into findings. A managed
+// certificate that was not issued yet has no end date and is left out.
+func gcpFindings(certs []gcp.Certificate, now time.Time, warn time.Duration) []scan.Finding {
+	findings := make([]scan.Finding, 0, len(certs))
+	for _, cert := range certs {
+		if cert.NotAfter == nil {
+			continue
 		}
-	} else {
-		writeText(s.Style.Writer(s.Stdout), s.Style, report, time.Since(start))
+		f := scan.Expiry(cert.Domain, *cert.NotAfter, now, warn)
+		f.GCP = &scan.GCPInfo{Name: cert.Name, Location: cert.Location, Managed: cert.Managed, InUseBy: orEmpty(cert.InUseBy)}
+		findings = append(findings, f)
 	}
-	return exitCode(findings)
+	return findings
 }
 
 // gcpError gives a Google Cloud failure its code: a project with Compute
@@ -124,7 +105,7 @@ func runGCP(ctx context.Context, args []string, s Streams) int {
 func gcpError(err error) *Error {
 	var apiErr *gcp.APIError
 	if errors.As(err, &apiErr) && apiErr.Disabled() {
-		return failf(CodeGCPDisabled, "%v", err)
+		return failf(CodeGCPComputeDisabled, "%v", err)
 	}
 	if errors.As(err, &apiErr) && (apiErr.Code == http.StatusUnauthorized || apiErr.Code == http.StatusForbidden) {
 		return failf(CodeGCPAccessDenied, "%v", err)

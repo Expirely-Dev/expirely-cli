@@ -3,9 +3,11 @@ package acm
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -99,5 +101,30 @@ func TestListReturnsDescribeErrors(t *testing.T) {
 
 	if err == nil || !strings.Contains(err.Error(), "describe ACM certificate arn:1: throttled") {
 		t.Fatalf("List() error = %v, want the describe error with the certificate ARN", err)
+	}
+}
+
+func TestListStopsDescribingAfterTheFirstError(t *testing.T) {
+	end := time.Now()
+	var summaries []types.CertificateSummary
+	for i := range 40 {
+		summaries = append(summaries, summary(fmt.Sprintf("arn:%d", i), "a.example.com", types.CertificateTypeImported, &end))
+	}
+	var calls atomic.Int32
+	f := &fakeACM{
+		pages: [][]types.CertificateSummary{summaries},
+		describeFn: func(arn string) error {
+			calls.Add(1)
+			return errors.New("throttled " + arn)
+		},
+	}
+
+	_, err := List(context.Background(), f)
+
+	if err == nil || !strings.Contains(err.Error(), "throttled") || errors.Is(err, context.Canceled) {
+		t.Errorf("List() error = %v, want the first describe error, not the cancellation it caused", err)
+	}
+	if n := calls.Load(); n > describeConcurrency+1 {
+		t.Errorf("DescribeCertificate called %d times, want at most %d after the first error", n, describeConcurrency+1)
 	}
 }

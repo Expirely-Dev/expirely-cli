@@ -128,14 +128,23 @@ type Options struct {
 
 // Scan probes the targets, at most opts.Concurrency at a time, and returns
 // one finding per target in the order of targets. A target that cannot be
-// read becomes a StatusError finding; Scan itself does not fail. Every
-// goroutine Scan starts has returned when Scan returns.
-func Scan(ctx context.Context, p Prober, targets []target.Target, opts Options) []Finding {
+// read becomes a StatusError finding. Once ctx is done, Scan starts no
+// more probes and returns ctx's error with no findings. Every goroutine
+// Scan starts has returned when Scan returns.
+func Scan(ctx context.Context, p Prober, targets []target.Target, opts Options) ([]Finding, error) {
 	findings := make([]Finding, len(targets))
 	sem := make(chan struct{}, max(opts.Concurrency, 1))
 	var wg sync.WaitGroup
+admit:
 	for i, t := range targets {
-		sem <- struct{}{}
+		if ctx.Err() != nil {
+			break
+		}
+		select {
+		case sem <- struct{}{}:
+		case <-ctx.Done():
+			break admit
+		}
 		wg.Go(func() {
 			defer func() { <-sem }()
 			findings[i] = scanOne(ctx, p, t, opts)
@@ -145,7 +154,10 @@ func Scan(ctx context.Context, p Prober, targets []target.Target, opts Options) 
 		})
 	}
 	wg.Wait()
-	return findings
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return findings, nil
 }
 
 func scanOne(ctx context.Context, p Prober, t target.Target, opts Options) Finding {
@@ -158,9 +170,26 @@ func scanOne(ctx context.Context, p Prober, t target.Target, opts Options) Findi
 	return Classify(r, opts.Now, opts.Warn)
 }
 
+// Expiry returns the finding for a certificate known by its end date
+// alone, as a cloud provider lists it: notAfter decides the status, expired
+// when it is not after now, expiring when it is within warn of now, ok
+// otherwise. The trust, leaf and chain fields stay nil.
+func Expiry(target string, notAfter, now time.Time, warn time.Duration) Finding {
+	status := StatusOK
+	switch {
+	case !notAfter.After(now):
+		status = StatusExpired
+	case notAfter.Sub(now) < warn:
+		status = StatusExpiring
+	}
+	days := daysLeft(notAfter.Sub(now))
+	expires := notAfter.UTC()
+	return Finding{Target: target, Status: status, DaysLeft: &days, ExpiresAt: &expires}
+}
+
 // Classify computes the finding for a probe result at now. The chain's
-// earliest NotAfter decides the status: expired when it is not after now,
-// expiring when it is within warn of now, ok otherwise.
+// earliest NotAfter decides the status, as in Expiry. r.Chain must not be
+// empty, which a Result returned without error guarantees.
 func Classify(r probe.Result, now time.Time, warn time.Duration) Finding {
 	chain := make([]Cert, 0, len(r.Chain))
 	earliest := r.Chain[0].NotAfter
@@ -178,40 +207,16 @@ func Classify(r probe.Result, now time.Time, warn time.Duration) Finding {
 		}
 	}
 
-	status := expiryStatus(earliest, now, warn)
-	days := daysLeft(earliest.Sub(now))
-	expires := earliest.UTC()
+	f := Expiry(r.Target.String(), earliest, now, warn)
 	trusted := r.VerifyError == nil
-	var verifyErr, issue *string
+	f.Trusted = &trusted
 	if r.VerifyError != nil {
 		msg := r.VerifyError.Error()
-		verifyErr = &msg
-		name := trustIssue(r.VerifyError, r.Chain[0])
-		issue = &name
+		issue := trustIssue(r.VerifyError, r.Chain[0])
+		f.VerifyError, f.TrustIssue = &msg, &issue
 	}
-	leaf := chain[0]
-	return Finding{
-		Target:      r.Target.String(),
-		Status:      status,
-		DaysLeft:    &days,
-		ExpiresAt:   &expires,
-		Trusted:     &trusted,
-		TrustIssue:  issue,
-		VerifyError: verifyErr,
-		Leaf:        &leaf,
-		Chain:       chain,
-	}
-}
-
-func expiryStatus(notAfter, now time.Time, warn time.Duration) Status {
-	switch {
-	case !notAfter.After(now):
-		return StatusExpired
-	case notAfter.Sub(now) < warn:
-		return StatusExpiring
-	default:
-		return StatusOK
-	}
+	f.Leaf, f.Chain = &chain[0], chain
+	return f
 }
 
 func daysLeft(d time.Duration) int {

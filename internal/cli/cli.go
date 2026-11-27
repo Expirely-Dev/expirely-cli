@@ -8,12 +8,10 @@ package cli
 
 import (
 	"context"
-	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"runtime/debug"
-	"slices"
 	"strings"
 	"time"
 
@@ -27,11 +25,14 @@ import (
 // Exit codes returned by Run, in order of precedence when a scan has
 // several outcomes: ExitFindings when any certificate is expired or
 // expiring, then ExitFailure when any target could not be read.
+// ExitInterrupted, 128 plus SIGINT as shells report it, means the run was
+// stopped before it ended and printed no results.
 const (
-	ExitOK       = 0
-	ExitFindings = 1
-	ExitUsage    = 2
-	ExitFailure  = 3
+	ExitOK          = 0
+	ExitFindings    = 1
+	ExitUsage       = 2
+	ExitFailure     = 3
+	ExitInterrupted = 130
 )
 
 // Streams holds the standard streams Run reads from and writes to.
@@ -107,14 +108,17 @@ Output
   -h, --help              show this help
 
 Exit codes
-  0 all ok, 1 expired or expiring, 2 usage error, 3 a target could not be read
+  0 all ok, 1 expired or expiring, 2 usage error, 3 a target could not be read,
+  130 stopped by Ctrl-C
 
 Docs: https://github.com/bycavii/expirely-cli
 `
 
 // Run executes expirely with args, which exclude the program name, and
 // returns the exit code. Help goes to stdout and exits ExitOK; errors go to
-// stderr and exit with the code errorCodes assigns to them.
+// stderr and exit with the code errorCodes assigns to them. When ctx is
+// done before the work ends, as on Ctrl-C, Run prints no results and
+// returns ExitInterrupted.
 func Run(ctx context.Context, args []string, s Streams) int {
 	if len(args) > 0 {
 		switch args[0] {
@@ -124,129 +128,73 @@ func Run(ctx context.Context, args []string, s Streams) int {
 			return runGCP(ctx, args[1:], s)
 		}
 	}
-	ag := detectAgent(s.Getenv, s.StdoutIsTerminal)
-	if ag.Name != "" {
-		s.Style = ui.Style{}
-	}
-	jsonOut := !s.StdoutIsTerminal || ag.Declared || wantsJSON(args)
-	out := func() mode { return mode{json: jsonOut, agent: ag.Name != ""} }
+	return runScan(ctx, args, s)
+}
 
+// runScan probes the targets named in args and in --file.
+func runScan(ctx context.Context, args []string, s Streams) int {
+	c := newCommand(s, args, usage)
 	fs := flag.NewFlagSet("expirely", flag.ContinueOnError)
-	fs.SetOutput(io.Discard)
 	showVersion := fs.Bool("version", false, "")
-	jsonFlag := fs.Bool("json", false, "")
-	warnDays := fs.Int("warn-days", defaultWarnDays, "")
-	timeout := fs.Duration("timeout", defaultTimeout, "")
+	w := windowFlags(fs, defaultTimeout)
 	concurrency := fs.Int("concurrency", defaultConcurrency, "")
 	details := fs.Bool("details", false, "")
 	var files, caFiles fileList
 	fs.Var(&caFiles, "ca-file", "")
 	fs.Var(&files, "file", "")
 	fs.Var(&files, "f", "")
-
-	if err := fs.Parse(args); err != nil {
-		if errors.Is(err, flag.ErrHelp) {
-			fmt.Fprint(s.Stdout, usage)
-			return ExitOK
-		}
-		return fail(s, out(), failf(CodeInvalidFlag, "%s", flagError(err)))
+	if code, done := c.parse(fs, args); done {
+		return code
 	}
-
-	fs.Visit(func(f *flag.Flag) {
-		if f.Name == "json" {
-			jsonOut = *jsonFlag
-		}
-	})
 
 	if *showVersion {
-		return printVersion(s, out())
+		if c.json {
+			return c.writeJSON(map[string]string{"version": version()})
+		}
+		fmt.Fprintf(c.Stdout, "expirely %s\n", version())
+		return ExitOK
 	}
-	if *warnDays < 0 {
-		return fail(s, out(), failf(CodeInvalidFlag, "--warn-days must be 0 or more, got %d", *warnDays))
-	}
-	if *timeout <= 0 {
-		return fail(s, out(), failf(CodeInvalidFlag, "--timeout must be positive, got %s", *timeout))
+	if e := w.check(); e != nil {
+		return c.fail(e)
 	}
 	if *concurrency < 1 {
-		return fail(s, out(), failf(CodeInvalidFlag, "--concurrency must be 1 or more, got %d", *concurrency))
+		return c.fail(failf(CodeInvalidFlag, "--concurrency must be 1 or more, got %d", *concurrency))
 	}
 
 	roots, e := loadRoots(caFiles)
 	if e != nil {
-		return fail(s, out(), e)
+		return c.fail(e)
 	}
-
-	targets, e := collectTargets(fs.Args(), files, s.Stdin)
+	targets, e := collectTargets(fs.Args(), files, c.Stdin)
 	if e != nil {
-		return fail(s, out(), e)
+		return c.fail(e)
 	}
 	if len(targets) == 0 {
 		if len(files) > 0 {
-			return fail(s, out(), failf(CodeMissingArguments, "no targets in %s", strings.Join(fileNames(files), ", ")))
+			return c.fail(failf(CodeMissingArguments, "no targets in %s", strings.Join(fileNames(files), ", ")))
 		}
-		if !jsonOut && ag.Name == "" {
-			fmt.Fprint(s.Stderr, intro)
+		if !c.json && c.agent.Name == "" {
+			fmt.Fprint(c.Stderr, intro)
 			return errorCodes[CodeMissingArguments]
 		}
-		return fail(s, out(), failf(CodeMissingArguments, "no targets: pass a host, host:port or https:// URL, or --file"))
+		return c.fail(failf(CodeMissingArguments, "no targets: pass a host, host:port or https:// URL, or --file"))
 	}
 
-	now := time.Now()
 	start := time.Now()
-	opts := scan.Options{
-		Warn:        time.Duration(*warnDays) * 24 * time.Hour,
-		Timeout:     *timeout,
-		Now:         now,
-		Concurrency: *concurrency,
-	}
+	opts := scan.Options{Warn: w.warn(), Timeout: w.timeout, Now: start, Concurrency: *concurrency}
 	var spinner *ui.Spinner
-	if s.StderrIsTerminal && ag.Name == "" {
-		spinner = ui.StartSpinner(s.Stderr, len(targets))
+	if c.StderrIsTerminal && c.agent.Name == "" {
+		spinner = ui.StartSpinner(c.Stderr, len(targets))
 		opts.Progress = spinner.Done
 	}
-	findings := scan.Scan(ctx, probe.Prober{Roots: roots}, targets, opts)
+	findings, err := scan.Scan(ctx, probe.Prober{Roots: roots}, targets, opts)
 	if spinner != nil {
 		spinner.Stop()
 	}
-
-	report := newReport(now, *warnDays, findings, *details)
-	if jsonOut {
-		if code := writeJSON(s, out(), report); code != ExitOK {
-			return code
-		}
-	} else {
-		writeText(s.Style.Writer(s.Stdout), s.Style, report, time.Since(start))
+	if err != nil {
+		return c.interrupted(err)
 	}
-	return exitCode(findings)
-}
-
-func exitCode(findings []scan.Finding) int {
-	code := ExitOK
-	for _, f := range findings {
-		switch f.Status {
-		case scan.StatusExpired, scan.StatusExpiring:
-			return ExitFindings
-		case scan.StatusError:
-			code = ExitFailure
-		}
-	}
-	return code
-}
-
-// wantsJSON reports whether args request JSON, read before flag parsing so
-// that a parse error is already reported in the format the caller asked for.
-func wantsJSON(args []string) bool {
-	return slices.ContainsFunc(args, func(a string) bool {
-		return a == "--json" || a == "-json" || a == "--json=true" || a == "-json=true"
-	})
-}
-
-func printVersion(s Streams, m mode) int {
-	if m.json {
-		return writeJSON(s, m, map[string]string{"version": version()})
-	}
-	fmt.Fprintf(s.Stdout, "expirely %s\n", version())
-	return ExitOK
+	return c.report(newReport(start, w.warnDays, findings, *details), time.Since(start))
 }
 
 // buildVersion is set by the release build with -ldflags -X; it is empty in

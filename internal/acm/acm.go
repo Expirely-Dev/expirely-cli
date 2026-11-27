@@ -71,17 +71,29 @@ func List(ctx context.Context, api API) ([]Certificate, error) {
 	return certs, nil
 }
 
+// describe fills in InUseBy for every certificate, describeConcurrency at a
+// time. The first failure stops the calls not yet made, and is the error
+// describe returns.
 func describe(ctx context.Context, api API, certs []Certificate) error {
+	ctx, cancel := context.WithCancelCause(ctx)
+	defer cancel(nil)
 	sem := make(chan struct{}, describeConcurrency)
-	errs := make([]error, len(certs))
 	var wg sync.WaitGroup
+admit:
 	for i := range certs {
-		sem <- struct{}{}
+		if ctx.Err() != nil {
+			break
+		}
+		select {
+		case sem <- struct{}{}:
+		case <-ctx.Done():
+			break admit
+		}
 		wg.Go(func() {
 			defer func() { <-sem }()
 			out, err := api.DescribeCertificate(ctx, &sdk.DescribeCertificateInput{CertificateArn: aws.String(certs[i].ARN)})
 			if err != nil {
-				errs[i] = fmt.Errorf("describe ACM certificate %s: %w", certs[i].ARN, err)
+				cancel(fmt.Errorf("describe ACM certificate %s: %w", certs[i].ARN, err))
 				return
 			}
 			if out.Certificate != nil {
@@ -90,10 +102,8 @@ func describe(ctx context.Context, api API, certs []Certificate) error {
 		})
 	}
 	wg.Wait()
-	for _, err := range errs {
-		if err != nil {
-			return err
-		}
+	if ctx.Err() != nil {
+		return context.Cause(ctx)
 	}
 	return nil
 }

@@ -103,7 +103,11 @@ func TestScanExplainsRealHandshakes(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tgt := target.Target{Host: "localhost", Port: ports[tt.name]}
-			got := Scan(context.Background(), probe.Prober{Roots: ca.Pool}, []target.Target{tgt}, Options{Timeout: 2 * time.Second, Now: time.Now()})[0]
+			findings, err := Scan(context.Background(), probe.Prober{Roots: ca.Pool}, []target.Target{tgt}, Options{Timeout: 2 * time.Second, Now: time.Now()})
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := findings[0]
 
 			if tt.wantReason != "" {
 				if got.Error == nil || got.Error.Reason != tt.wantReason {

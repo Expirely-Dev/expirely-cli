@@ -32,4 +32,7 @@ func TestClean(t *testing.T) {
 	if got := Clean("ok\x1b[31mred\x07\n\u009b"); got != "ok[31mred" {
 		t.Errorf("Clean() = %q, want control characters removed", got)
 	}
+	if got := Clean("evil\u202egpj.com\u200b"); got != "evilgpj.com" {
+		t.Errorf("Clean() = %q, want the bidi override and zero-width space removed", got)
+	}
 }
