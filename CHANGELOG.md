@@ -2,6 +2,19 @@
 
 Every release of expirely, newest first. From v0.4.0 on, release-please writes this file from the commit titles. Until 1.0, a release can change flags, JSON fields and codes; such a change is listed as breaking, with what to do.
 
+## [0.5.0](https://github.com/bycavii/expirely-cli/compare/v0.4.0...v0.5.0) (2026-11-27)
+
+
+### Added
+
+* **gcp:** read certificate manager certificates in every location ([df5d1a0](https://github.com/bycavii/expirely-cli/commit/df5d1a0538fbc599d3ec530a4c63a539f517f3c9))
+
+
+### Fixed
+
+* **gcp:** report a project with compute or billing disabled ([a96e90a](https://github.com/bycavii/expirely-cli/commit/a96e90aa1a66fd1827f565f64bc5ec9accf10a45))
+* stop on ctrl-c and share one command plumbing ([f02c2a7](https://github.com/bycavii/expirely-cli/commit/f02c2a7cd78e610da42ca8f5cb7692c0d746e6ed))
+
 ## [0.4.0](https://github.com/bycavii/expirely-cli/compare/v0.3.0...v0.4.0) (2026-11-27)
 
 
