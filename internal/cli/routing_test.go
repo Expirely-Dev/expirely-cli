@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/expirely-dev/expirely-cli/internal/acm"
+	"github.com/expirely-dev/expirely-cli/internal/tls/acm"
 )
 
 func route(t *testing.T, env map[string]string, args ...string) (code int, stdout, stderr string) {

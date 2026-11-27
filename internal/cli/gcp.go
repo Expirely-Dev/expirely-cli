@@ -8,8 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/expirely-dev/expirely-cli/internal/gcp"
-	"github.com/expirely-dev/expirely-cli/internal/scan"
+	"github.com/expirely-dev/expirely-cli/internal/tls/gcp"
 )
 
 const defaultGCPTimeout = 30 * time.Second
@@ -95,29 +94,9 @@ func runGCP(ctx context.Context, args []string, s Streams) int {
 		return c.fail(gcpError(err))
 	}
 	now := time.Now()
-	r := newReport(now, w.warnDays, gcpFindings(listing.Certificates, now, w.warn()), v)
+	r := newReport(now, w.warnDays, gcp.Findings(listing.Certificates, now, w.warn()), v)
 	r.Unreadable = orEmpty(listing.Unreachable)
 	return c.report(r, time.Since(start))
-}
-
-// gcpFindings turns a project's certificates into findings. A managed
-// certificate that was not issued yet has no end date and is unknown;
-// gcp.state says why.
-func gcpFindings(certs []gcp.Certificate, now time.Time, warn time.Duration) []scan.Finding {
-	findings := make([]scan.Finding, 0, len(certs))
-	for _, cert := range certs {
-		f := scan.Unknown(scan.SourceGCP, cert.Domain)
-		if cert.NotAfter != nil {
-			f = scan.Expiry(scan.SourceGCP, cert.Domain, *cert.NotAfter, now, warn)
-		}
-		var state *string
-		if cert.State != "" {
-			state = &cert.State
-		}
-		f.GCP = &scan.GCPInfo{Name: cert.Name, Location: cert.Location, Source: cert.Source, Managed: cert.Managed, State: state, InUseBy: orEmpty(cert.InUseBy)}
-		findings = append(findings, f)
-	}
-	return findings
 }
 
 // gcpError gives a Google Cloud failure its code: a project with Compute

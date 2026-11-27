@@ -14,8 +14,8 @@ import (
 
 	"github.com/charmbracelet/colorprofile"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/expirely-dev/expirely-cli/internal/scan"
-	"github.com/expirely-dev/expirely-cli/internal/tlstest"
+	"github.com/expirely-dev/expirely-cli/internal/tls/scan"
+	"github.com/expirely-dev/expirely-cli/internal/tls/tlstest"
 	"github.com/expirely-dev/expirely-cli/internal/ui"
 )
 
