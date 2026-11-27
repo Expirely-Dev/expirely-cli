@@ -94,28 +94,33 @@ func build(input, host, port string) (Target, error) {
 	if ip := net.ParseIP(host); ip != nil {
 		return Target{Host: ip.String(), Port: p}, nil
 	}
-	if !validHostname(host) {
-		return Target{}, &ParseError{Input: input, Reason: "host contains an invalid character"}
+	if reason := hostnameProblem(host); reason != "" {
+		return Target{}, &ParseError{Input: input, Reason: reason}
 	}
 	return Target{Host: strings.ToLower(host), Port: p}, nil
 }
 
-// validHostname reports whether host uses only letters, digits, hyphens,
-// underscores and dots, with no empty label.
-func validHostname(host string) bool {
+// hostnameProblem says what makes host not a host name, or returns "" when
+// it is one: only letters, digits, hyphens, underscores and dots, no empty
+// label, and no label that starts or ends with a hyphen, as RFC 1123
+// requires, so a mistyped flag such as "--json" is never taken for a host.
+func hostnameProblem(host string) string {
 	if len(host) > 253 {
-		return false
+		return "host contains an invalid character"
 	}
 	for label := range strings.SplitSeq(host, ".") {
 		if label == "" || len(label) > 63 {
-			return false
+			return "host contains an invalid character"
 		}
 		for _, r := range label {
 			ok := r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '-' || r == '_'
 			if !ok {
-				return false
+				return "host contains an invalid character"
 			}
 		}
+		if label[0] == '-' || label[len(label)-1] == '-' {
+			return "a part of the host starts or ends with a hyphen"
+		}
 	}
-	return true
+	return ""
 }

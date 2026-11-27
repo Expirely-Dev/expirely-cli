@@ -10,7 +10,10 @@ expirely prints this report when `--json` is set or stdout is not a terminal. Th
   "schema_version": 1,
   "scanned_at": "2026-11-26T23:13:59.39399Z",
   "warn_days": 30,
-  "summary": { "error": 0, "expired": 1, "expiring": 0, "ok": 0 },
+  "summary": { "error": 0, "expired": 1, "expiring": 0, "ok": 0, "total": 1 },
+  "filter": { "status": ["expired", "expiring", "error", "ok"], "limit": null },
+  "matched": 1,
+  "truncated": false,
   "results": [
     {
       "target": "expired.badssl.com:443",
@@ -41,8 +44,31 @@ expirely prints this report when `--json` is set or stdout is not a terminal. Th
 | `schema_version` | The version of this format, `1`. It changes when a field is removed or changes meaning, not when one is added |
 | `scanned_at` | When the scan ran, RFC 3339 in UTC |
 | `warn_days` | The `--warn-days` value used |
-| `summary` | Count of targets per status: `ok`, `expiring`, `expired`, `error` |
-| `results` | One entry per target, in the order the targets were given |
+| `summary` | Count of every result per status, `ok`, `expiring`, `expired` and `error`, and their `total`. Filters never change it |
+| `filter` | What the report shows: `status`, the statuses shown, most urgent first, and `limit`, the `--limit` value or `null` |
+| `matched` | How many results have a status in `filter.status`, before `--limit` |
+| `truncated` | `true` when `--limit` left out some of the `matched` results; always present |
+| `results` | The results shown, most urgent first |
+
+The counts come before `results`, so a reader that sees only the start of a long report, as an agent shown the head of a command's output does, still knows how many results there are and whether it has them all.
+
+## Show less
+
+Three flags, on `expirely`, `expirely aws` and `expirely gcp`, shrink what the report shows. None of them changes `summary` or the exit code: a certificate that expired fails the run even when `--status ok` hides it.
+
+| Flag | Effect |
+|---|---|
+| `--status LIST` | Shows only results with these statuses. `all` shows every status, the default. A declared [AI agent](/agents) that passes no `--status` gets `expired,expiring,error` |
+| `--limit N` | Shows at most `N` of the matched results, the most urgent ones; `truncated` says whether any were left out |
+| `--fields LIST` | Keeps only these keys in each result, in the order below, with `target` always first. A key the result has no value for, such as `acm` on a scanned target, is `null`. `--fields chain` keeps the chain without `--details`. It needs JSON output |
+
+Lists take commas, a repeated flag, or both: `--status expired,expiring` is `--status expired --status expiring`. Every value is checked before the first connection, and an unknown status or field exits `2` with `invalid_flag`, naming the valid ones.
+
+Results are always sorted the same way, in JSON and in text: by status, `expired`, `expiring`, `error`, `ok`; then a certificate in use before one nothing uses, for `expirely aws` and `expirely gcp`; then fewest `days_left`, with unknown days last; then in the order they came. In text, a last line such as `showing 7 of 240 (--status expired,expiring; --limit 20)` says what was left out.
+
+```sh
+expirely -f targets.txt --status expired,expiring --fields status,days_left --limit 20
+```
 
 ## Result
 

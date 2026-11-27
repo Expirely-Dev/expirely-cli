@@ -40,25 +40,48 @@ func newCommand(s Streams, args []string, help string) *command {
 	}
 }
 
-// parse defines --json on fs and parses args. It returns done with the exit
-// code when the command is over: after printing the help for -h, or after
-// reporting a flag error.
-func (c *command) parse(fs *flag.FlagSet, args []string) (code int, done bool) {
+// parse defines --json on fs and parses args, with flags before, between
+// or after the other arguments, which it returns in order; everything after
+// "--" is an argument. It returns done with the exit code when the command
+// is over: after printing the help for -h, or after reporting a flag error.
+func (c *command) parse(fs *flag.FlagSet, args []string) (rest []string, code int, done bool) {
 	fs.SetOutput(io.Discard)
 	jsonFlag := fs.Bool("json", false, "")
-	if err := fs.Parse(args); err != nil {
+	rest, err := parseInterspersed(fs, args)
+	if err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			fmt.Fprint(c.Stdout, c.help)
-			return ExitOK, true
+			return nil, ExitOK, true
 		}
-		return c.fail(failf(CodeInvalidFlag, "%s", flagError(err))), true
+		return nil, c.fail(failf(CodeInvalidFlag, "%s", flagError(err))), true
 	}
 	fs.Visit(func(f *flag.Flag) {
 		if f.Name == "json" {
 			c.json = *jsonFlag
 		}
 	})
-	return ExitOK, false
+	return rest, ExitOK, false
+}
+
+// parseInterspersed parses args with fs as people type them in gh or
+// kubectl: the flag package stops at the first argument that is not a
+// flag, so parsing resumes after each one until "--" or the end.
+func parseInterspersed(fs *flag.FlagSet, args []string) ([]string, error) {
+	var rest []string
+	for {
+		if err := fs.Parse(args); err != nil {
+			return nil, err
+		}
+		left := fs.Args()
+		if consumed := len(args) - len(left); consumed > 0 && args[consumed-1] == "--" {
+			return append(rest, left...), nil
+		}
+		if len(left) == 0 {
+			return rest, nil
+		}
+		rest = append(rest, left[0])
+		args = left[1:]
+	}
 }
 
 // fail prints e and returns its exit code. In JSON it prints the envelope;
@@ -103,7 +126,8 @@ func (c *command) writeJSON(v any) int {
 }
 
 // report prints r, in JSON or as text with the time the work took, and
-// returns the exit code its results call for.
+// returns the exit code every result calls for, shown or not: --status,
+// --limit and --fields change what is printed, never what fails.
 func (c *command) report(r report, elapsed time.Duration) int {
 	if c.json {
 		if code := c.writeJSON(r); code != ExitOK {
@@ -112,7 +136,7 @@ func (c *command) report(r report, elapsed time.Duration) int {
 	} else {
 		writeText(c.Style.Writer(c.Stdout), c.Style, r, elapsed)
 	}
-	return exitCode(r.Results)
+	return exitCode(r.all)
 }
 
 // envelope is the JSON a command error prints on stderr. Usage holds the

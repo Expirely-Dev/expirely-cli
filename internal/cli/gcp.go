@@ -32,6 +32,10 @@ Scan
 
 Output
       --json              print JSON; the default when stdout is not a terminal
+      --status LIST       show only these statuses: expired, expiring, error, ok, all
+                          (default all; a declared agent gets expired,expiring,error)
+      --fields LIST       keep only these keys in each JSON result; target is always kept
+      --limit N           show at most N results, most urgent first
   -h, --help              show this help
 
 expirely gcp signs in with Application Default Credentials, lists the Compute
@@ -46,13 +50,18 @@ func runGCP(ctx context.Context, args []string, s Streams) int {
 	fs := flag.NewFlagSet("expirely gcp", flag.ContinueOnError)
 	project := fs.String("project", "", "")
 	w := windowFlags(fs, defaultGCPTimeout)
-	if code, done := c.parse(fs, args); done {
+	v := viewFlags(fs)
+	rest, code, done := c.parse(fs, args)
+	if done {
 		return code
 	}
-	if fs.NArg() > 0 {
-		return c.fail(failf(CodeInvalidFlag, "expirely gcp takes no targets, got %q", fs.Arg(0)))
+	if len(rest) > 0 {
+		return c.fail(failf(CodeInvalidFlag, "expirely gcp takes no targets, got %q", rest[0]))
 	}
 	if e := w.check(); e != nil {
+		return c.fail(e)
+	}
+	if e := v.resolve(c, fs); e != nil {
 		return c.fail(e)
 	}
 	if *project == "" && c.Getenv != nil {
@@ -82,7 +91,7 @@ func runGCP(ctx context.Context, args []string, s Streams) int {
 		return c.fail(gcpError(err))
 	}
 	now := time.Now()
-	return c.report(newReport(now, w.warnDays, gcpFindings(certs, now, w.warn()), false), time.Since(start))
+	return c.report(newReport(now, w.warnDays, gcpFindings(certs, now, w.warn()), v), time.Since(start))
 }
 
 // gcpFindings turns a project's certificates into findings. A managed

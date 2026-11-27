@@ -104,10 +104,14 @@ Scan
 Output
       --json              print JSON; the default when stdout is not a terminal
       --details           add every certificate of each chain to the JSON
+      --status LIST       show only these statuses: expired, expiring, error, ok, all
+                          (default all; a declared agent gets expired,expiring,error)
+      --fields LIST       keep only these keys in each JSON result; target is always kept
+      --limit N           show at most N results, most urgent first
       --version           print the version
   -h, --help              show this help
 
-Exit codes
+Exit codes, over every result whatever --status, --fields and --limit show
   0 all ok, 1 expired or expiring, 2 usage error, 3 a target could not be read,
   130 stopped by Ctrl-C
 
@@ -138,12 +142,14 @@ func runScan(ctx context.Context, args []string, s Streams) int {
 	showVersion := fs.Bool("version", false, "")
 	w := windowFlags(fs, defaultTimeout)
 	concurrency := fs.Int("concurrency", defaultConcurrency, "")
-	details := fs.Bool("details", false, "")
+	v := viewFlags(fs)
+	fs.BoolVar(&v.details, "details", false, "")
 	var files, caFiles fileList
 	fs.Var(&caFiles, "ca-file", "")
 	fs.Var(&files, "file", "")
 	fs.Var(&files, "f", "")
-	if code, done := c.parse(fs, args); done {
+	rest, code, done := c.parse(fs, args)
+	if done {
 		return code
 	}
 
@@ -157,6 +163,9 @@ func runScan(ctx context.Context, args []string, s Streams) int {
 	if e := w.check(); e != nil {
 		return c.fail(e)
 	}
+	if e := v.resolve(c, fs); e != nil {
+		return c.fail(e)
+	}
 	if *concurrency < 1 {
 		return c.fail(failf(CodeInvalidFlag, "--concurrency must be 1 or more, got %d", *concurrency))
 	}
@@ -165,7 +174,7 @@ func runScan(ctx context.Context, args []string, s Streams) int {
 	if e != nil {
 		return c.fail(e)
 	}
-	targets, e := collectTargets(fs.Args(), files, c.Stdin)
+	targets, e := collectTargets(rest, files, c.Stdin)
 	if e != nil {
 		return c.fail(e)
 	}
@@ -194,7 +203,7 @@ func runScan(ctx context.Context, args []string, s Streams) int {
 	if err != nil {
 		return c.interrupted(err)
 	}
-	return c.report(newReport(start, w.warnDays, findings, *details), time.Since(start))
+	return c.report(newReport(start, w.warnDays, findings, v), time.Since(start))
 }
 
 // buildVersion is set by the release build with -ldflags -X; it is empty in

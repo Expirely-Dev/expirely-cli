@@ -186,14 +186,15 @@ func TestRunScanJSON(t *testing.T) {
 		name       string
 		ports      []int
 		wantCode   int
+		wantOrder  []int
 		wantStatus []string
 		wantDays   []int
 	}{
-		{name: "all ok", ports: []int{healthy}, wantCode: ExitOK, wantStatus: []string{"ok"}, wantDays: []int{89}},
-		{name: "expiring wins over ok", ports: []int{healthy, expiring}, wantCode: ExitFindings, wantStatus: []string{"ok", "expiring"}, wantDays: []int{89, 5}},
-		{name: "expired is a finding", ports: []int{expired}, wantCode: ExitFindings, wantStatus: []string{"expired"}, wantDays: []int{-1}},
-		{name: "unreadable target", ports: []int{healthy, closed}, wantCode: ExitFailure, wantStatus: []string{"ok", "error"}, wantDays: []int{89, 0}},
-		{name: "finding wins over unreadable", ports: []int{closed, expired}, wantCode: ExitFindings, wantStatus: []string{"error", "expired"}, wantDays: []int{0, -1}},
+		{name: "all ok", ports: []int{healthy}, wantCode: ExitOK, wantOrder: []int{0}, wantStatus: []string{"ok"}, wantDays: []int{89}},
+		{name: "expiring wins over ok", ports: []int{healthy, expiring}, wantCode: ExitFindings, wantOrder: []int{1, 0}, wantStatus: []string{"expiring", "ok"}, wantDays: []int{5, 89}},
+		{name: "expired is a finding", ports: []int{expired}, wantCode: ExitFindings, wantOrder: []int{0}, wantStatus: []string{"expired"}, wantDays: []int{-1}},
+		{name: "unreadable target", ports: []int{healthy, closed}, wantCode: ExitFailure, wantOrder: []int{1, 0}, wantStatus: []string{"error", "ok"}, wantDays: []int{0, 89}},
+		{name: "finding wins over unreadable", ports: []int{closed, expired}, wantCode: ExitFindings, wantOrder: []int{1, 0}, wantStatus: []string{"expired", "error"}, wantDays: []int{-1, 0}},
 	}
 
 	for _, tt := range tests {
@@ -221,8 +222,8 @@ func TestRunScanJSON(t *testing.T) {
 				t.Fatalf("len(results) = %d, want %d", len(got.Results), len(tt.ports))
 			}
 			for i, r := range got.Results {
-				if want := fmt.Sprintf("localhost:%d", tt.ports[i]); r.Target != want {
-					t.Errorf("results[%d].target = %q, want %q (input order)", i, r.Target, want)
+				if want := fmt.Sprintf("localhost:%d", tt.ports[tt.wantOrder[i]]); r.Target != want {
+					t.Errorf("results[%d].target = %q, want %q (most urgent first)", i, r.Target, want)
 				}
 				if r.Status != tt.wantStatus[i] {
 					t.Errorf("results[%d].status = %q, want %q", i, r.Status, tt.wantStatus[i])

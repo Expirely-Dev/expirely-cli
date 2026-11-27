@@ -16,6 +16,9 @@ expirely gcp --project acme-production --json | jq '.results[] | select(.gcp.man
 | `--project ID`       | Project to read. Default `GOOGLE_CLOUD_PROJECT`, then `CLOUDSDK_CORE_PROJECT`               |
 | `--warn-days N`      | Report certificates that expire within `N` days as `expiring`, `0` or more. Default `30`    |
 | `--timeout DURATION` | Time allowed to read the project, such as `1m`. Default `30s`                                |
+| `--fields LIST`      | Keep only these keys in each JSON result, in the order the report prints them; `target` is always kept, and a key with no value is `null`. A comma list, or the flag repeated. Needs JSON output |
+| `--limit N`          | Show at most `N` results, `1` or more, most urgent first. No limit by default |
+| `--status LIST`      | Show only results with these statuses: `expired`, `expiring`, `error`, `ok`, or `all`. A comma list, or the flag repeated. Default `all`; a declared agent gets `expired,expiring,error` |
 | `--json`             | Print JSON. Also the default when stdout is not a terminal                                   |
 | `-h`, `--help`       | Print the help as text and exit `0`                                                          |
 

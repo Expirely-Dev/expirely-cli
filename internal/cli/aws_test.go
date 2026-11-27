@@ -128,11 +128,22 @@ func TestAWSJSON(t *testing.T) {
 		Imported bool     `json:"imported"`
 		InUseBy  []string `json:"in_use_by"`
 	}
-	if err := json.Unmarshal(got.Results[1]["acm"], &info); err != nil || info.ARN != "arn:2" || !info.Imported || len(info.InUseBy) != 2 {
-		t.Errorf("results[1].acm = %s, want the imported certificate used twice", got.Results[1]["acm"])
+	var arns []string
+	for _, r := range got.Results {
+		var a struct {
+			ARN string `json:"arn"`
+		}
+		_ = json.Unmarshal(r["acm"], &a)
+		arns = append(arns, a.ARN)
 	}
-	if string(got.Results[1]["trusted"]) != "null" {
-		t.Errorf("results[1].trusted = %s, want null for an ACM certificate", got.Results[1]["trusted"])
+	if want := "arn:6,arn:5,arn:2,arn:1,arn:3"; strings.Join(arns, ",") != want {
+		t.Errorf("results order = %v, want %s: expired before expiring, in use before unused, fewest days first", arns, want)
+	}
+	if err := json.Unmarshal(got.Results[2]["acm"], &info); err != nil || info.ARN != "arn:2" || !info.Imported || len(info.InUseBy) != 2 {
+		t.Errorf("results[2].acm = %s, want the imported certificate used twice", got.Results[2]["acm"])
+	}
+	if string(got.Results[2]["trusted"]) != "null" {
+		t.Errorf("results[2].trusted = %s, want null for an ACM certificate", got.Results[2]["trusted"])
 	}
 }
 

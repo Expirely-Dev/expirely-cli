@@ -39,7 +39,7 @@ func sampleReport() report {
 		{Target: "self-signed.badssl.com:443", Status: scan.StatusOK, DaysLeft: ptr(727), ExpiresAt: expires("2028-11-23T21:00:00Z"), Trusted: ptr(false), TrustIssue: ptr(scan.TrustSelfSigned)},
 		{Target: "evil\x1b[2J.example:443", Status: scan.StatusOK, DaysLeft: ptr(0), ExpiresAt: expires("2026-11-27T01:00:00Z"), Trusted: ptr(false), TrustIssue: ptr(scan.TrustUnknownAuthority)},
 	}
-	return newReport(time.Date(2026, 11, 26, 22, 0, 0, 0, time.UTC), 30, findings, false)
+	return newReport(time.Date(2026, 11, 26, 22, 0, 0, 0, time.UTC), 30, findings, nil)
 }
 
 func TestWriteTextGolden(t *testing.T) {

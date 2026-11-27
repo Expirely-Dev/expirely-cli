@@ -62,6 +62,9 @@ func TestParseErrors(t *testing.T) {
 		{"[", "invalid character"},
 		{"exa..mple.com", "invalid character"},
 		{"éxample.com", "invalid character"},
+		{"--json", "starts or ends with a hyphen"},
+		{"-example.com", "starts or ends with a hyphen"},
+		{"example-.com:8443", "starts or ends with a hyphen"},
 	}
 
 	for _, tt := range tests {

@@ -33,6 +33,10 @@ Scan
 
 Output
       --json              print JSON; the default when stdout is not a terminal
+      --status LIST       show only these statuses: expired, expiring, error, ok, all
+                          (default all; a declared agent gets expired,expiring,error)
+      --fields LIST       keep only these keys in each JSON result; target is always kept
+      --limit N           show at most N results, most urgent first
   -h, --help              show this help
 
 expirely aws only calls acm:ListCertificates and acm:DescribeCertificate and changes nothing.
@@ -56,13 +60,18 @@ func runAWS(ctx context.Context, args []string, s Streams) int {
 	profile := fs.String("profile", "", "")
 	region := fs.String("region", "", "")
 	w := windowFlags(fs, defaultAWSTimeout)
-	if code, done := c.parse(fs, args); done {
+	v := viewFlags(fs)
+	rest, code, done := c.parse(fs, args)
+	if done {
 		return code
 	}
-	if fs.NArg() > 0 {
-		return c.fail(failf(CodeInvalidFlag, "expirely aws takes no targets, got %q", fs.Arg(0)))
+	if len(rest) > 0 {
+		return c.fail(failf(CodeInvalidFlag, "expirely aws takes no targets, got %q", rest[0]))
 	}
 	if e := w.check(); e != nil {
+		return c.fail(e)
+	}
+	if e := v.resolve(c, fs); e != nil {
 		return c.fail(e)
 	}
 
@@ -91,7 +100,7 @@ func runAWS(ctx context.Context, args []string, s Streams) int {
 		return c.fail(awsError(err))
 	}
 	now := time.Now()
-	return c.report(newReport(now, w.warnDays, acmFindings(certs, now, w.warn()), false), time.Since(start))
+	return c.report(newReport(now, w.warnDays, acmFindings(certs, now, w.warn()), v), time.Since(start))
 }
 
 // acmFindings turns ACM certificates into findings. A certificate that was

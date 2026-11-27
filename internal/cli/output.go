@@ -1,7 +1,7 @@
 package cli
 
 import (
-	"cmp"
+	"encoding/json"
 	"fmt"
 	"io"
 	"slices"
@@ -13,46 +13,104 @@ import (
 	"github.com/bycavii/expirely-cli/internal/ui"
 )
 
-// report is the JSON document a scan prints; its field names are part of
-// the public contract.
+// report is the JSON document a command prints; its field names are part
+// of the public contract. Summary counts every result, with their total;
+// Matched counts those whose status the view shows, and Truncated is true
+// when --limit left some of them out of Results. The counts come before
+// Results, so a reader that only sees the start of the output still knows
+// what it is missing.
 type report struct {
 	SchemaVersion int            `json:"schema_version"`
 	ScannedAt     time.Time      `json:"scanned_at"`
 	WarnDays      int            `json:"warn_days"`
 	Summary       map[string]int `json:"summary"`
+	Filter        reportFilter   `json:"filter"`
+	Matched       int            `json:"matched"`
+	Truncated     bool           `json:"truncated"`
 	Results       []scan.Finding `json:"results"`
+
+	all    []scan.Finding
+	fields []string
+}
+
+// reportFilter says which results the report shows: Status lists the
+// statuses shown, most urgent first, and Limit is the --limit value, or
+// nil without one.
+type reportFilter struct {
+	Status []scan.Status `json:"status"`
+	Limit  *int          `json:"limit"`
+}
+
+// MarshalJSON prints each result with only the --fields keys when some
+// were chosen.
+func (r report) MarshalJSON() ([]byte, error) {
+	type plain report
+	if len(r.fields) == 0 {
+		return json.Marshal(plain(r))
+	}
+	projected := make([]projection, len(r.Results))
+	for i, f := range r.Results {
+		projected[i] = projection{finding: f, fields: r.fields}
+	}
+	return json.Marshal(struct {
+		plain
+		Results []projection `json:"results"`
+	}{plain(r), projected})
 }
 
 // schemaVersion is the version of the JSON report. It changes when a field
 // is removed or changes meaning; adding a field keeps it.
 const schemaVersion = 1
 
-// newReport builds the report for findings. Without details, each result
-// leaves out its certificate chain and keeps the leaf.
-func newReport(now time.Time, warnDays int, findings []scan.Finding, details bool) report {
-	if !details {
-		findings = slices.Clone(findings)
-		for i := range findings {
-			findings[i].Chain = nil
-		}
+// newReport builds the report for findings as v shows them: sorted most
+// urgent first, the statuses v shows, at most v.limit of them, and without
+// certificate chains unless v keeps them. A nil v shows everything.
+func newReport(now time.Time, warnDays int, findings []scan.Finding, v *view) report {
+	if v == nil {
+		v = &view{}
 	}
-	summary := map[string]int{
-		string(scan.StatusOK):       0,
-		string(scan.StatusExpiring): 0,
-		string(scan.StatusExpired):  0,
-		string(scan.StatusError):    0,
+	statuses := v.statuses
+	if len(statuses) == 0 {
+		statuses = statusOrder
+	}
+	summary := map[string]int{"total": len(findings)}
+	for _, s := range statusOrder {
+		summary[string(s)] = 0
 	}
 	for _, f := range findings {
 		summary[string(f.Status)]++
 	}
-	return report{SchemaVersion: schemaVersion, ScannedAt: now.UTC(), WarnDays: warnDays, Summary: summary, Results: findings}
-}
 
-var urgency = map[scan.Status]int{
-	scan.StatusExpired:  0,
-	scan.StatusExpiring: 1,
-	scan.StatusError:    2,
-	scan.StatusOK:       3,
+	var shown []scan.Finding
+	for _, f := range byUrgency(findings) {
+		if slices.Contains(statuses, f.Status) {
+			if !v.details {
+				f.Chain = nil
+			}
+			shown = append(shown, f)
+		}
+	}
+	r := report{
+		SchemaVersion: schemaVersion,
+		ScannedAt:     now.UTC(),
+		WarnDays:      warnDays,
+		Summary:       summary,
+		Filter:        reportFilter{Status: statuses},
+		Matched:       len(shown),
+		Results:       shown,
+		all:           findings,
+		fields:        v.fields,
+	}
+	if v.limitSet {
+		r.Filter.Limit = &v.limit
+		if len(shown) > v.limit {
+			r.Results, r.Truncated = shown[:v.limit], true
+		}
+	}
+	if r.Results == nil {
+		r.Results = []scan.Finding{}
+	}
+	return r
 }
 
 var trustWords = map[string]string{
@@ -62,21 +120,14 @@ var trustWords = map[string]string{
 	scan.TrustInvalid:          "not trusted",
 }
 
-// writeText prints one line per target, most urgent first, then a summary
-// with the time the scan took. Cells are padded as plain text and styled
-// afterwards, so the plain render and the styled render line up the same.
-// Text read from certificates and errors passes through ui.Clean.
+// writeText prints one line per result the report shows, in its order,
+// then a summary of every result with the time the work took, and a line
+// saying what was left out when a filter or --limit hid any. Cells are
+// padded as plain text and styled afterwards, so the plain render and the
+// styled render line up the same. Text read from certificates and errors
+// passes through ui.Clean.
 func writeText(w io.Writer, st ui.Style, r report, elapsed time.Duration) {
-	rows := slices.Clone(r.Results)
-	slices.SortStableFunc(rows, func(a, b scan.Finding) int {
-		if c := cmp.Compare(urgency[a.Status], urgency[b.Status]); c != 0 {
-			return c
-		}
-		if c := cmp.Compare(inUse(a), inUse(b)); c != 0 {
-			return c
-		}
-		return cmp.Compare(days(a), days(b))
-	})
+	rows := r.Results
 
 	cells := make([][4]string, len(rows))
 	var width [4]int
@@ -115,7 +166,33 @@ func writeText(w io.Writer, st ui.Style, r report, elapsed time.Duration) {
 	b.WriteString(" ")
 	b.WriteString(st.Faint("in " + duration(elapsed)))
 	b.WriteString("\n")
+	if hidden := hiddenNote(r); hidden != "" {
+		b.WriteString("  ")
+		b.WriteString(st.Faint(hidden))
+		b.WriteString("\n")
+	}
 	fmt.Fprint(w, b.String())
+}
+
+// hiddenNote says how many results the report shows out of all of them,
+// and with which flags, or is empty when it shows them all.
+func hiddenNote(r report) string {
+	total := r.Summary["total"]
+	if len(r.Results) == total {
+		return ""
+	}
+	var flags []string
+	if len(r.Filter.Status) < len(statusOrder) {
+		names := make([]string, len(r.Filter.Status))
+		for i, s := range r.Filter.Status {
+			names[i] = string(s)
+		}
+		flags = append(flags, "--status "+strings.Join(names, ","))
+	}
+	if r.Truncated {
+		flags = append(flags, "--limit "+strconv.Itoa(*r.Filter.Limit))
+	}
+	return "showing " + strconv.Itoa(len(r.Results)) + " of " + strconv.Itoa(total) + " (" + strings.Join(flags, "; ") + ")"
 }
 
 // cellStyle styles column c of a row: the status in its color, the target
@@ -271,7 +348,7 @@ func inUse(f scan.Finding) int {
 
 func summary(st ui.Style, r report) string {
 	var parts []string
-	for _, s := range []scan.Status{scan.StatusExpired, scan.StatusExpiring, scan.StatusError, scan.StatusOK} {
+	for _, s := range statusOrder {
 		if n := r.Summary[string(s)]; n > 0 {
 			parts = append(parts, paint(st, s, strconv.Itoa(n)+" "+statusWord(s)))
 		}
