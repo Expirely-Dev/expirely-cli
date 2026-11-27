@@ -16,6 +16,12 @@ It only reads: a TLS handshake, or a few list calls to AWS or Google Cloud. Exit
 ## Install
 
 ```sh
+brew install bycavii/tap/expirely
+```
+
+Or with Go 1.27 or newer:
+
+```sh
 go install github.com/bycavii/expirely-cli/cmd/expirely@latest
 ```
 

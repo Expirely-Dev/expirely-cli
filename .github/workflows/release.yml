@@ -55,3 +55,27 @@ jobs:
       - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-checksums: dist/checksums.txt
+
+  homebrew:
+    needs: [release-please, artifacts]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: release
+    permissions: {}
+    steps:
+      - id: app-token
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: bycavii
+          repositories: homebrew-tap
+          permission-actions: write
+      - name: Ask the tap to publish the release
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          TAG: ${{ needs.release-please.outputs.tag }}
+          REVIEWER: ${{ github.actor }}
+        run: |
+          gh workflow run publish-release.yml --repo bycavii/homebrew-tap \
+            --field version="$TAG" --field reviewer="$REVIEWER"

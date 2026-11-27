@@ -1,10 +1,21 @@
 ---
 title: Install expirely
 sidebarTitle: Install
-description: Install expirely from a release, with Go or from source.
+description: Install expirely with Homebrew, from a release, with Go or from source.
 ---
 
 expirely is one static binary for Linux, macOS and Windows. It needs no server, no configuration and no credentials.
+
+## With Homebrew
+
+On macOS and Linux:
+
+```sh
+brew install bycavii/tap/expirely
+expirely --version
+```
+
+`brew upgrade` keeps it current. Installing by the full name taps [bycavii/homebrew-tap](https://github.com/bycavii/homebrew-tap) and trusts only this formula. The formula of each version is generated after its release: the archives pass `gh attestation verify` against the release workflow before their checksums go into it, so Homebrew installs only binaries this repository built.
 
 ## From a release
 
