@@ -33,6 +33,6 @@ Releases are automated with [release-please](https://github.com/googleapis/relea
 - before 1.0, a breaking change (`!` after the type, and a `BREAKING CHANGE:` footer) raises the minor version;
 - `docs`, `build`, `ci`, `chore`, `refactor` and `test` release nothing and stay out of the changelog.
 
-Merging the release pull request tags the version and publishes its GitHub release. The same workflow then runs `just check-ci`, collects the third-party licenses and lets GoReleaser attach the archives and `checksums.txt` to that release. `just snapshot` builds the same archives into `./dist` without publishing.
+Merging the release pull request tags the version and publishes its GitHub release. The same workflow then runs `just check-ci`, collects the third-party licenses and lets GoReleaser attach the archives and `checksums.txt` to that release, and `actions/attest` signs a SLSA build provenance attestation for every archive listed in `checksums.txt`. `just snapshot` builds the same archives into `./dist` without publishing.
 
 Since commit titles choose the version, CI rejects a title outside `<type>(<scope>): <summary>`; `just commit-check <range>` runs the same check locally.

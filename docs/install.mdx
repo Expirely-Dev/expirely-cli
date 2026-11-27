@@ -1,10 +1,24 @@
 ---
 title: Install expirely
 sidebarTitle: Install
-description: Install expirely with Go or build it from source.
+description: Install expirely from a release, with Go or from source.
 ---
 
 expirely is one static binary for Linux, macOS and Windows. It needs no server, no configuration and no credentials.
+
+## From a release
+
+Each [release](https://github.com/bycavii/expirely-cli/releases) has an archive for Linux, macOS and Windows on amd64 and arm64, with the binary, the license and the licenses of every module it links under `third-party/`, plus `checksums.txt`. On macOS on Apple silicon:
+
+```sh
+gh release download --repo bycavii/expirely-cli --pattern 'expirely_*_darwin_arm64.tar.gz'
+gh attestation verify expirely_*_darwin_arm64.tar.gz --repo bycavii/expirely-cli \
+  --signer-workflow bycavii/expirely-cli/.github/workflows/release.yml
+tar -xzf expirely_*_darwin_arm64.tar.gz expirely
+./expirely --version
+```
+
+Every archive from v0.5.0 on carries a [SLSA build provenance](https://slsa.dev/spec/v1.0/provenance) attestation, signed through Sigstore with the identity of the release workflow, with no key to manage. `gh attestation verify` passes only for an archive that workflow built from this repository, at the commit the attestation names. Older archives are checked against `checksums.txt` alone.
 
 ## With Go
 
