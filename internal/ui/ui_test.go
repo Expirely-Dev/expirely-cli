@@ -36,3 +36,26 @@ func TestClean(t *testing.T) {
 		t.Errorf("Clean() = %q, want the bidi override and zero-width space removed", got)
 	}
 }
+
+func TestWrap(t *testing.T) {
+	tests := []struct {
+		name  string
+		text  string
+		width int
+		want  string
+	}{
+		{name: "fits", text: "one two", width: 80, want: "one two"},
+		{name: "breaks at a space", text: "one two three", width: 7, want: "one two\nthree"},
+		{name: "exactly the width stays", text: "abc def", width: 7, want: "abc def"},
+		{name: "a long word stays whole", text: "see https://example.com/a/long/path now", width: 10, want: "see\nhttps://example.com/a/long/path\nnow"},
+		{name: "empty", text: "", width: 80, want: ""},
+		{name: "runs of spaces collapse", text: "one   two", width: 80, want: "one two"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := Wrap(tt.text, tt.width); got != tt.want {
+				t.Errorf("Wrap(%q, %d) = %q, want %q", tt.text, tt.width, got, tt.want)
+			}
+		})
+	}
+}

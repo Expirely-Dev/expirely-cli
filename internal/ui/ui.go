@@ -68,6 +68,27 @@ func (s Style) Good(text string) string { return s.apply(green, text) }
 // Note marks a remark a person should read, such as a trust problem.
 func (s Style) Note(text string) string { return s.apply(warn, text) }
 
+// Wrap breaks text into lines of at most width columns, at spaces. A word
+// longer than width, such as a URL, stays whole on a line of its own.
+func Wrap(text string, width int) string {
+	var b strings.Builder
+	column := 0
+	for word := range strings.FieldsSeq(text) {
+		switch {
+		case column == 0:
+		case column+1+len(word) > width:
+			b.WriteByte('\n')
+			column = 0
+		default:
+			b.WriteByte(' ')
+			column++
+		}
+		b.WriteString(word)
+		column += len(word)
+	}
+	return b.String()
+}
+
 // Clean removes control and format characters from text that came from
 // outside expirely, such as a certificate field or an error from a peer, so
 // it cannot move the cursor, recolor the terminal or change its title, and

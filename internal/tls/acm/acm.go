@@ -8,6 +8,7 @@ package acm
 import (
 	"cmp"
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"sync"
@@ -150,6 +151,10 @@ func NewSession(ctx context.Context, profile, region string) (*Session, error) {
 		opts = append(opts, config.WithRegion(region))
 	}
 	cfg, err := config.LoadDefaultConfig(ctx, opts...)
+	var noProfile config.SharedConfigProfileNotExistError
+	if errors.As(err, &noProfile) {
+		return nil, fmt.Errorf("no AWS profile named %q in the shared AWS config", profile)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("load AWS configuration: %w", err)
 	}

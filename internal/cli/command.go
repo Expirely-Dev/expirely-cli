@@ -96,11 +96,16 @@ func (c *command) noArguments(name string, rest []string) (code int, done bool) 
 		fmt.Fprint(c.Stdout, c.help)
 		return ExitOK, true
 	}
-	return c.fail(failf(CodeUnexpectedArgument, "%s takes flags only, got %q", name, rest[0])), true
+	return c.fail(failf(CodeUnexpectedArgument, "unexpected argument %q; %s takes flags only", rest[0], name)), true
 }
 
+// textWidth is the widest line expirely writes for a person, the width
+// every help fits too.
+const textWidth = 80
+
 // fail prints e and returns its exit code. In JSON it prints the envelope;
-// in text it prints the message and, on the next line, what resolves it.
+// in text it prints the message and, on the next lines, what resolves it,
+// both wrapped at textWidth.
 // A usage error read by an agent also gets the whole help, since an agent
 // cannot ask for --help the way a person glances at it.
 func (c *command) fail(e *Error) int {
@@ -120,7 +125,7 @@ func (c *command) fail(e *Error) int {
 		}
 		return code
 	}
-	fmt.Fprintf(c.Stderr, "expirely: %s\n%s\n", ui.Clean(e.Message), remediations[e.Code])
+	fmt.Fprintf(c.Stderr, "%s\n%s\n", ui.Wrap("expirely: "+ui.Clean(e.Message), textWidth), ui.Wrap(remediations[e.Code], textWidth))
 	if help != "" {
 		fmt.Fprintf(c.Stderr, "\n%s", help)
 	}

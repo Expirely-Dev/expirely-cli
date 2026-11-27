@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -133,5 +135,20 @@ func TestListStopsDescribingAfterTheFirstError(t *testing.T) {
 	}
 	if n := calls.Load(); n > describeConcurrency+1 {
 		t.Errorf("DescribeCertificate called %d times, want at most %d after the first error", n, describeConcurrency+1)
+	}
+}
+
+func TestNewSessionNamesAMissingProfile(t *testing.T) {
+	empty := filepath.Join(t.TempDir(), "config")
+	if err := os.WriteFile(empty, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("AWS_CONFIG_FILE", empty)
+	t.Setenv("AWS_SHARED_CREDENTIALS_FILE", empty)
+
+	_, err := NewSession(context.Background(), "missing", "us-east-1")
+
+	if want := `no AWS profile named "missing" in the shared AWS config`; err == nil || err.Error() != want {
+		t.Errorf("NewSession() error = %v, want %q", err, want)
 	}
 }
