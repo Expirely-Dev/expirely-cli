@@ -79,3 +79,27 @@ jobs:
         run: |
           gh workflow run publish-release.yml --repo bycavii/homebrew-tap \
             --field version="$TAG" --field reviewer="$REVIEWER"
+
+  action:
+    needs: [release-please, artifacts]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: release
+    permissions: {}
+    steps:
+      - id: app-token
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: bycavii
+          repositories: expirely-action
+          permission-actions: write
+      - name: Ask the action to make this release its default
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          TAG: ${{ needs.release-please.outputs.tag }}
+          REVIEWER: ${{ github.actor }}
+        run: |
+          gh workflow run bump-cli.yml --repo bycavii/expirely-action \
+            --field version="$TAG" --field reviewer="$REVIEWER"
