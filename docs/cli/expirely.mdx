@@ -17,15 +17,17 @@ expirely tls gcp --project acme-production
 | [`expirely tls`](/cli/tls) | Checks the certificates TLS endpoints serve |
 | [`expirely tls aws`](/cli/tls-aws) | Lists the certificates in AWS Certificate Manager |
 | [`expirely tls gcp`](/cli/tls-gcp) | Lists the certificates of a Google Cloud project |
+| `expirely help [COMMAND]` | Prints the help of a command, as `expirely help tls` or `expirely help tls aws`; the same text as its `--help`. `expirely tls help` works too |
 
 | Flag | Description |
 | --- | --- |
 | `--version` | Print the version and exit `0` |
+| `--json` | With `--version`, print it as JSON, `{"version":"..."}`. Also the default when stdout is not a terminal |
 | `-h`, `--help` | Print this help and exit `0`. Each command prints its own flags with `--help` |
 
 ## Shared by every command
 
-Every command reports the same way: the same statuses, the same [JSON report](/reference/output), the same [error codes](/reference/error-codes), and the same exit codes: `0` when every certificate is `ok`, `1` when one is `expired` or `expiring`, `2` for a usage error, `3` when something could not be read or an end date is `unknown`, and `130` when Ctrl-C stopped the run. `1` wins over `3`. The environment variables each command reads are in [expirely tls](/cli/tls#environment).
+Every command reports the same way: the same statuses, the same [JSON report](/reference/output), the same [error codes](/reference/error-codes), and the same exit codes: `0` when every certificate is `ok`, `1` when one is `expired`, `revoked` or `expiring`, `2` for a usage error, `3` when something could not be read or an end date is `unknown`, and `130` when Ctrl-C stopped the run. `1` wins over `3`. The environment variables each command reads are in [expirely tls](/cli/tls#environment).
 
 ## Commands that moved
 

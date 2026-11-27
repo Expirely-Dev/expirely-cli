@@ -18,9 +18,9 @@ expirely tls -f targets.txt --concurrency 64 --timeout 3s
 | `--concurrency N`    | Targets scanned at once, `1` or more. Default `16`                                                |
 | `--details`          | Add every certificate of each chain to the JSON, as `tls.chain`. Without it, each result keeps only the leaf |
 | `--fields LIST`      | Keep only these keys in each JSON result, in the order the report prints them; `target` is always kept, and a key with no value is `null`. A comma list, or the flag repeated. Needs JSON output |
-| `--revocation`       | Also check each certificate against the revocation list (CRL) its CA publishes, fetched over HTTP from the URL in the certificate. Off by default. See [Revocation](#revocation) |
+| `--revocation`       | Also ask the CA of each trusted certificate whether it was revoked, by fetching the revocation list (CRL) the certificate names over HTTP. A revoked certificate gets the status `revoked`. Off by default. See [Revocation](#revocation) |
 | `--limit N`          | Show at most `N` results, `1` or more, most urgent first. No limit by default |
-| `--status LIST`      | Show only results with these statuses: `expired`, `expiring`, `error`, `unknown`, `ok`, or `all`. A comma list, or the flag repeated. Default `all`; a declared agent gets `expired,expiring,error,unknown` |
+| `--status LIST`      | Show only results with these statuses: `expired`, `revoked`, `expiring`, `error`, `unknown`, `ok`, or `all`. A comma list, or the flag repeated. Default `all`; a declared agent gets every status but `ok` |
 | `-f`, `--file PATH`  | Read targets from `PATH`, one per line; `-` reads stdin. Can be given more than once              |
 | `-h`, `--help`       | Print the help as text and exit `0`                                                               |
 | `--json`             | Print JSON. Also the default when stdout is not a terminal                                        |
@@ -28,7 +28,7 @@ expirely tls -f targets.txt --concurrency 64 --timeout 3s
 | `--version`          | Print the version and exit `0`                                                                    |
 | `--warn-days N`      | Report certificates that expire within `N` days as `expiring`, `0` or more. Default `30`          |
 
-Flags can come before, between or after the targets. Everything after `--` is a target.
+Flags can come before, between or after the targets. Everything after `--` is a target. `expirely tls help` prints the help, as `--help` does, so a host named `help` is scanned as `expirely tls -- help`.
 
 ## Status
 
@@ -37,6 +37,7 @@ Each target gets one status:
 | Status     | Meaning                                                    |
 | ---------- | ---------------------------------------------------------- |
 | `expired`  | The first certificate in the chain to expire has expired   |
+| `revoked`  | With `--revocation`: its CA revoked it, and it has not expired |
 | `expiring` | It expires within `--warn-days`                            |
 | `ok`       | It expires later than that                                 |
 | `error`    | The target could not be read                               |
@@ -47,13 +48,15 @@ The status comes from the earliest `NotAfter` in the chain the server sends, so 
 
 Without `--revocation`, expirely does not look at revocation: a revoked certificate far from expiry is `ok`, and `tls.revocation` is `null`, which means not checked, not good.
 
-With `--revocation`, expirely reads the first `http://` or `https://` CRL URL in each leaf, fetches that list from the CA, verifies its signature against the issuer certificate the server sent, and looks up the leaf's serial number. Each CRL is fetched once per run, within `--timeout`, up to 10 MiB, and never through a redirect to another host. The result is `tls.revocation`, described in [Output](/reference/output#tls):
+With it, a certificate its CA revoked gets the status `revoked` and the run exits `1`, as for an expired one: browsers that check revocation refuse it today. A certificate that is both is `expired`.
+
+For each chain that verifies, expirely reads the first `http://` or `https://` CRL URL in the leaf, fetches that list from the CA, verifies its signature against the issuer certificate the server sent, and looks up the leaf's serial number. Each CRL is fetched once per run, within `--timeout`, up to 10 MiB, and never through a redirect to another host. The result is `tls.revocation`, described in [Output](/reference/output#tls):
 
 - `good`: the CRL does not list the certificate.
 - `revoked`: the CRL lists it; `reason` says when it was revoked.
-- `unknown`: no verdict, and `reason` says why: the certificate names no CRL, the server sent no issuer, the fetch failed or timed out, the list is over the size cap, out of date, or not signed by the issuer.
+- `unknown`: no verdict, and `reason` says why: the chain is not trusted, the certificate names no CRL, the server sent no issuer, the fetch failed or timed out, the list is over the size cap, out of date, or not signed by the issuer.
 
-Revocation does not change the status or the exit code, as trust does not: a revoked certificate far from expiry stays `ok`. In GitHub Actions it is listed in the job summary and gets an error annotation. OCSP is not used; a CA that publishes only OCSP gives `unknown`.
+The CRL of a chain that does not verify is never fetched. Its URL was written by whoever serves the certificate, so fetching it would let a scanned host choose an address for expirely to connect to, such as one inside your network. Trust the chain with `--ca-file` to check an internal CA's certificates. A revocation state of `unknown` does not change the status or the exit code. OCSP is not used; a CA that publishes only OCSP gives `unknown`.
 
 ## Output
 
@@ -69,11 +72,10 @@ The text output has one line per target, most urgent first, then the counts and 
   1 expired, 1 failed, 1 ok in 622ms
 ```
 
-- The status comes first: `expired`, `expiring`, `failed` or `ok`. `failed` is the `error` status of JSON.
+- The status comes first: `expired`, `revoked`, `expiring`, `failed`, `unknown` or `ok`. `failed` is the `error` status of JSON.
 - The default port is left out, as in `example.com`; other ports are shown.
 - A chain that is not trusted says why: `self-signed`, `untrusted issuer`, `wrong name` or `not trusted`. An expired chain needs no note.
-- With `--revocation`, a revoked certificate shows `revoked` as its note, before any trust note.
-- In a terminal with color, `expired` and `failed` are red, `expiring` is yellow and `ok` is green. With `NO_COLOR` set or `TERM=dumb` the text is the same without color.
+- In a terminal with color, `expired`, `revoked` and `failed` are red, `expiring` is yellow and `ok` is green. With `NO_COLOR` set or `TERM=dumb` the text is the same without color.
 - While a scan that takes longer than 150 ms runs, stderr shows `Scanning N targets` with the count finished so far, and erases that line before the results print. It appears only when stderr is a terminal, so pipes, logs, CI and agents never see it.
 
 Text taken from certificates and errors has its control characters removed before it reaches a terminal.
@@ -91,4 +93,4 @@ Text taken from certificates and errors has its control characters removed befor
 
 ## Exit codes
 
-Every exit code is computed over all results, whatever `--status`, `--fields` and `--limit` show. `0` when every target is `ok`, `1` when a certificate is `expired` or `expiring`, `2` for a usage error, `3` when a target could not be read or an end date is `unknown`, and `130` when Ctrl-C stopped the scan, which then prints no results. `1` wins over `3`. A second Ctrl-C ends expirely at once. Each code is in [Error codes](/reference/error-codes).
+Every exit code is computed over all results, whatever `--status`, `--fields` and `--limit` show. `0` when every target is `ok`, `1` when a certificate is `expired`, `revoked` or `expiring`, `2` for a usage error, `3` when a target could not be read or an end date is `unknown`, and `130` when Ctrl-C stopped the scan, which then prints no results. `1` wins over `3`. A second Ctrl-C ends expirely at once. Each code is in [Error codes](/reference/error-codes).

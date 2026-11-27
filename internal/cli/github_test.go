@@ -55,7 +55,7 @@ func TestGitHubActionsSummaryAndAnnotations(t *testing.T) {
 		"| expired | `api.example.org` |",
 		"| expiring | `api.example.com` |",
 		"ACM us-east-1, in use by 2 resources",
-		"Checked 6: 2 ok, 1 expiring, 2 expired, 0 unreadable, 1 unknown. warn-days 30,",
+		"Checked 6: 2 ok, 1 expiring, 2 expired, 0 revoked, 0 unreadable, 1 unknown. warn-days 30,",
 	} {
 		if !strings.Contains(summary, want) {
 			t.Errorf("summary lacks %q:\n%s", want, summary)

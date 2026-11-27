@@ -11,7 +11,9 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"regexp"
 	"runtime/debug"
+	"slices"
 	"strings"
 	"time"
 
@@ -64,7 +66,7 @@ const (
 	defaultConcurrency = 16
 )
 
-const tagline = "expirely tells you when your TLS certificates expire, before they break anything."
+const tagline = "expirely tells you what expires next, before it breaks anything."
 
 // rootUsage is the help of expirely itself, which only routes to its
 // commands.
@@ -77,6 +79,7 @@ Commands
   tls                     check the certificates TLS endpoints serve
   tls aws                 list the certificates in AWS Certificate Manager
   tls gcp                 list the certificates of a Google Cloud project
+  help [COMMAND]          show the help of a command, as in expirely help tls
 
 Examples
   expirely tls example.com api.example.com:8443
@@ -85,6 +88,7 @@ Examples
 
 Flags
       --version           print the version
+      --json              print the version as JSON
   -h, --help              show this help
 
 Each command lists its own flags with --help, such as expirely tls --help.
@@ -101,6 +105,15 @@ const intro = `expirely tls checks the certificates TLS endpoints serve.
   expirely tls --help           every flag
 `
 
+// viewUsage is the help of the flags every command that reports takes to
+// show less.
+const viewUsage = `      --status LIST       show only these statuses, as a comma list: expired,
+                          revoked, expiring, error, unknown, ok, or all (the
+                          default; a declared agent gets all but ok)
+      --fields LIST       keys to keep in each JSON result; target always stays
+      --limit N           show at most N results, most urgent first
+`
+
 const tlsUsage = `expirely tls checks the certificates TLS endpoints serve and when they expire.
 
 Usage
@@ -110,8 +123,9 @@ Usage
   expirely tls gcp [flags]
 
 Commands
-  expirely tls aws        list the certificates in AWS Certificate Manager; see expirely tls aws --help
-  expirely tls gcp        list the certificates of a Google Cloud project; see expirely tls gcp --help
+  expirely tls aws        list the certificates in AWS Certificate Manager
+  expirely tls gcp        list the certificates of a Google Cloud project
+  expirely tls help       show this help; aws and gcp have their own --help
 
 Examples
   expirely tls example.com api.example.com:8443
@@ -125,25 +139,27 @@ Targets
 
 Scan
       --warn-days N       flag certificates expiring within N days (default 30)
-      --timeout DURATION  time each target has to connect and handshake (default 10s)
+      --timeout DURATION  time each target has to answer (default 10s)
       --concurrency N     targets scanned at once (default 16)
       --ca-file PATH      also trust the CA certificates in this PEM file
-      --revocation        also check each certificate against the revocation list (CRL)
-                          its CA publishes; fetches that list over HTTP
+      --revocation        also ask the CA of each trusted certificate whether
+                          it was revoked, by fetching its CRL over HTTP
 
 Output
       --json              print JSON; the default when stdout is not a terminal
       --details           add every certificate of each chain to the JSON
-      --status LIST       show only these statuses: expired, expiring, error, unknown, ok, all
-                          (default all; a declared agent gets expired,expiring,error,unknown)
-      --fields LIST       keep only these keys in each JSON result; target is always kept
-      --limit N           show at most N results, most urgent first
-      --version           print the version
+` + viewUsage + `      --version           print the version
   -h, --help              show this help
 
+Environment
+  NO_COLOR=1              text without color
+  EXPIRELY_AGENT=1        report as to an AI agent: JSON and no spinner;
+                          0 turns the detection of agents off
+  EXPIRELY_GITHUB=0       no job summary or annotations in GitHub Actions
+
 Exit codes, over every result whatever --status, --fields and --limit show
-  0 all ok, 1 expired or expiring, 2 usage error, 3 a target could not be read
-  or an end date is unknown, 130 stopped by Ctrl-C
+  0 all ok, 1 expired, revoked or expiring, 2 usage error, 3 a target could
+  not be read or an end date is unknown, 130 stopped by Ctrl-C
 
 Docs: https://github.com/expirely-dev/expirely-cli
 `
@@ -154,22 +170,94 @@ Docs: https://github.com/expirely-dev/expirely-cli
 // done before the work ends, as on Ctrl-C, Run prints no results and
 // returns ExitInterrupted.
 func Run(ctx context.Context, args []string, s Streams) int {
-	if len(args) == 0 || isHelp(args[0]) {
+	if len(args) == 0 {
 		fmt.Fprint(s.Stdout, rootUsage)
 		return ExitOK
 	}
 	switch {
 	case args[0] == "tls":
 		return runTLS(ctx, args[1:], s)
-	case onlyRootFlags(args):
-		return runScan(ctx, args, s)
+	case args[0] == "help":
+		return runHelp(args[1:], s)
+	case strings.HasPrefix(args[0], "-"):
+		return runRoot(args, s)
 	}
+	return newCommand(s, args, rootUsage).fail(unknownCommand(args[0]))
+}
+
+// runRoot runs expirely with flags and no command: --version prints the
+// version, and the flags alone print the help. A flag expirely itself does
+// not take, such as -f, belongs to a command, so the error says where it
+// goes unless it is a likely typo of a root flag.
+func runRoot(args []string, s Streams) int {
 	c := newCommand(s, args, rootUsage)
-	return c.fail(failf(CodeUnknownCommand, "unknown command %q; did you mean %q?", args[0], "expirely tls "+args[0]))
+	fs := flag.NewFlagSet("expirely", flag.ContinueOnError)
+	showVersion := fs.Bool("version", false, "")
+	if name := strings.TrimLeft(strings.SplitN(args[0], "=", 2)[0], "-"); !isHelp(args[0]) && name != "json" && fs.Lookup(name) == nil && suggest(fs, name) == "" {
+		return c.fail(failf(CodeInvalidFlag, "unknown flag %s; the flags of a check come after its command, as in %q", args[0], "expirely tls "+args[0]))
+	}
+	rest, code, done := c.parse(fs, args)
+	if done {
+		return code
+	}
+	if len(rest) > 0 {
+		return c.fail(unknownCommand(rest[0]))
+	}
+	if !*showVersion {
+		fmt.Fprint(c.Stdout, rootUsage)
+		return ExitOK
+	}
+	if c.json {
+		return c.writeJSON(map[string]string{"version": version()})
+	}
+	fmt.Fprintf(c.Stdout, "expirely %s\n", version())
+	return ExitOK
+}
+
+// runHelp prints the help of the command topic names: none for expirely
+// itself, tls, tls aws or tls gcp.
+func runHelp(topic []string, s Streams) int {
+	usage, ok := map[string]string{"": rootUsage, "tls": tlsUsage, "tls aws": awsUsage, "tls gcp": gcpUsage}[strings.Join(topic, " ")]
+	if !ok {
+		return newCommand(s, topic, rootUsage).fail(failf(CodeUnknownCommand, "no help for %q; there is help for tls, tls aws and tls gcp", strings.Join(topic, " ")))
+	}
+	fmt.Fprint(s.Stdout, usage)
+	return ExitOK
+}
+
+// unknownCommand is the error for a first argument that is no command. It
+// names the command meant when the argument is one that used to run without
+// tls, a target, or a likely typo.
+func unknownCommand(arg string) *Error {
+	switch {
+	case arg == "aws" || arg == "gcp" || strings.ContainsAny(arg, ".:/"):
+		return failf(CodeUnknownCommand, "unknown command %q; did you mean %q?", arg, "expirely tls "+arg)
+	case arg == "version":
+		return failf(CodeUnknownCommand, "unknown command %q; did you mean %q?", arg, "expirely --version")
+	}
+	for _, name := range []string{"tls", "help"} {
+		if typo(strings.ToLower(arg), name) {
+			return failf(CodeUnknownCommand, "unknown command %q; did you mean %q?", arg, "expirely "+name)
+		}
+	}
+	return failf(CodeUnknownCommand, "unknown command %q", arg)
+}
+
+// typo reports whether got is name with one letter wrong, missing or
+// extra, or with its letters in another order.
+func typo(got, name string) bool {
+	if editDistance(got, name) <= 1 {
+		return true
+	}
+	a, b := []byte(got), []byte(name)
+	slices.Sort(a)
+	slices.Sort(b)
+	return slices.Equal(a, b)
 }
 
 // runTLS runs expirely tls: a scan of the targets in args, or, when args
-// start with aws or gcp, the listing of that provider's certificates.
+// start with aws or gcp, the listing of that provider's certificates, or
+// with help, the help. A host named help is scanned as expirely tls -- help.
 func runTLS(ctx context.Context, args []string, s Streams) int {
 	if len(args) > 0 {
 		switch args[0] {
@@ -177,6 +265,8 @@ func runTLS(ctx context.Context, args []string, s Streams) int {
 			return runAWS(ctx, args[1:], s)
 		case "gcp":
 			return runGCP(ctx, args[1:], s)
+		case "help":
+			return runHelp(append([]string{"tls"}, args[1:]...), s)
 		}
 	}
 	return runScan(ctx, args, s)
@@ -184,19 +274,6 @@ func runTLS(ctx context.Context, args []string, s Streams) int {
 
 func isHelp(arg string) bool {
 	return arg == "help" || arg == "-h" || arg == "-help" || arg == "--help"
-}
-
-// onlyRootFlags reports whether args hold only flags expirely itself
-// takes, such as expirely --version --json.
-func onlyRootFlags(args []string) bool {
-	for _, a := range args {
-		switch a {
-		case "--version", "-version", "--json", "-json", "--json=true", "-json=true", "--json=false", "-json=false":
-		default:
-			return false
-		}
-	}
-	return true
 }
 
 // runScan probes the targets named in args and in --file.
@@ -307,8 +384,24 @@ func flagError(fs *flag.FlagSet, args []string, err error) string {
 	if name, ok := strings.CutPrefix(msg, "flag needs an argument: -"); ok {
 		return "--" + strings.TrimPrefix(name, "-") + " needs a value"
 	}
+	if m := invalidValue.FindStringSubmatch(msg); m != nil {
+		if f := fs.Lookup(m[2]); f != nil {
+			if g, ok := f.Value.(flag.Getter); ok {
+				switch g.Get().(type) {
+				case time.Duration:
+					return fmt.Sprintf("--%s takes a duration such as 5s or 1m30s, got %q", m[2], m[1])
+				case int:
+					return fmt.Sprintf("--%s takes a whole number, got %q", m[2], m[1])
+				}
+			}
+		}
+	}
 	return strings.Replace(msg, " flag -", " flag --", 1)
 }
+
+// invalidValue matches the flag package's error for a value a flag cannot
+// parse, capturing the value and the flag's name.
+var invalidValue = regexp.MustCompile(`^invalid value "(.*)" for flag -([a-z-]+): `)
 
 // typed returns the argument, up to any "=", that named the flag name, with
 // the dashes it was given; "--" + name when no argument did.

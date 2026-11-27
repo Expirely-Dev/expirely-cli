@@ -68,7 +68,13 @@ func TestOldFormsAreUnknownCommands(t *testing.T) {
 		{[]string{"aws", "--region", "us-east-1"}, `unknown command "aws"; did you mean "expirely tls aws"?`},
 		{[]string{"gcp", "--project", "acme"}, `unknown command "gcp"; did you mean "expirely tls gcp"?`},
 		{[]string{"example.com"}, `unknown command "example.com"; did you mean "expirely tls example.com"?`},
-		{[]string{"-f", "targets.txt"}, `unknown command "-f"; did you mean "expirely tls -f"?`},
+		{[]string{"-f", "targets.txt"}, `unknown flag -f; the flags of a check come after its command, as in "expirely tls -f"`},
+		{[]string{"version"}, `unknown command "version"; did you mean "expirely --version"?`},
+		{[]string{"tsl", "example.com"}, `unknown command "tsl"; did you mean "expirely tls"?`},
+		{[]string{"completion"}, `unknown command "completion"`},
+		{[]string{"-v"}, `unknown flag -v; did you mean --version?`},
+		{[]string{"--vresion"}, `unknown flag --vresion; did you mean --version?`},
+		{[]string{"--json", "example.com"}, `unknown command "example.com"; did you mean "expirely tls example.com"?`},
 	}
 	for _, tt := range tests {
 		code, stdout, stderr := route(t, nil, tt.args...)
@@ -101,5 +107,60 @@ func TestUnknownCommandGivesAnAgentTheRootHelp(t *testing.T) {
 	var got envelope
 	if err := json.Unmarshal([]byte(stderr), &got); err != nil || got.Error.Usage != rootUsage {
 		t.Errorf("stderr = %q, want the envelope with the root help in usage", stderr)
+	}
+}
+
+func TestHelpIsACommandToo(t *testing.T) {
+	tests := []struct {
+		args []string
+		want string
+	}{
+		{[]string{"--json"}, rootUsage},
+		{[]string{"help", "tls"}, tlsUsage},
+		{[]string{"help", "tls", "aws"}, awsUsage},
+		{[]string{"help", "tls", "gcp"}, gcpUsage},
+		{[]string{"tls", "help"}, tlsUsage},
+		{[]string{"tls", "help", "aws"}, awsUsage},
+		{[]string{"tls", "aws", "help"}, awsUsage},
+		{[]string{"tls", "gcp", "help"}, gcpUsage},
+	}
+	for _, tt := range tests {
+		code, stdout, stderr := route(t, nil, tt.args...)
+
+		if code != ExitOK || stdout != tt.want || stderr != "" {
+			t.Errorf("expirely %q = %d, stdout %q, stderr %q; want 0 and that command's help", tt.args, code, stdout, stderr)
+		}
+	}
+
+	code, _, stderr := route(t, nil, "help", "dns")
+	var got envelope
+	if err := json.Unmarshal([]byte(stderr), &got); err != nil || code != ExitUsage || got.Error.Code != CodeUnknownCommand {
+		t.Errorf("expirely help dns = %d, stderr %q; want exit 2 and unknown_command", code, stderr)
+	}
+}
+
+func TestAHostNamedHelpIsScannedAfterTheSeparator(t *testing.T) {
+	_, stdout, _ := route(t, nil, "tls", "--timeout", "1ms", "--", "help")
+
+	if !strings.Contains(stdout, `"target":"help:443"`) {
+		t.Errorf("stdout = %q, want the host help scanned", stdout)
+	}
+}
+
+func TestHelpFitsAnEightyColumnTerminal(t *testing.T) {
+	for name, usage := range map[string]string{"expirely": rootUsage, "tls": tlsUsage, "tls aws": awsUsage, "tls gcp": gcpUsage, "intro": intro} {
+		for line := range strings.SplitSeq(usage, "\n") {
+			if len(line) > 80 {
+				t.Errorf("the help of %s has a line of %d columns, over 80: %q", name, len(line), line)
+			}
+		}
+	}
+}
+
+func TestHelpNamesEveryStatus(t *testing.T) {
+	for _, s := range statusOrder {
+		if !strings.Contains(viewUsage, string(s)) {
+			t.Errorf("the --status help lacks %q", s)
+		}
 	}
 }

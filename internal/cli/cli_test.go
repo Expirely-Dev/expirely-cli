@@ -404,7 +404,8 @@ func TestFlagError(t *testing.T) {
 		{[]string{"--nope", "--", "--nope"}, "unknown flag --nope"},
 		{[]string{"aws", "-v"}, "unknown flag -v"},
 		{[]string{"gcp", "--projet", "x"}, "unknown flag --projet; did you mean --project?"},
-		{[]string{"--warn-days", "x"}, `invalid value "x" for flag --warn-days: parse error`},
+		{[]string{"--warn-days", "x"}, `--warn-days takes a whole number, got "x"`},
+		{[]string{"--timeout", "5"}, `--timeout takes a duration such as 5s or 1m30s, got "5"`},
 		{[]string{"--timeout"}, "--timeout needs a value"},
 	}
 	for _, tt := range tests {

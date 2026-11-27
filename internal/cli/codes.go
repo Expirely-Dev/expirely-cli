@@ -8,6 +8,7 @@ import "fmt"
 const (
 	CodeInvalidFlag        = "invalid_flag"
 	CodeUnknownCommand     = "unknown_command"
+	CodeUnexpectedArgument = "unexpected_argument"
 	CodeInvalidTarget      = "invalid_target"
 	CodeMissingArguments   = "missing_arguments"
 	CodeFileUnreadable     = "file_unreadable"
@@ -29,6 +30,7 @@ const (
 var remediations = map[string]string{
 	CodeInvalidFlag:        "Each command lists every flag and the values it accepts in its --help.",
 	CodeUnknownCommand:     "expirely --help lists the commands; checks run under expirely tls, such as expirely tls example.com, expirely tls aws and expirely tls gcp.",
+	CodeUnexpectedArgument: "expirely tls aws and expirely tls gcp read a whole account or project and take flags only; targets go to expirely tls.",
 	CodeInvalidTarget:      "A target is host, host:port, [ipv6]:port or https://host/path; the port defaults to 443.",
 	CodeMissingArguments:   "Targets come as arguments, such as expirely tls example.com, or one per line from --file.",
 	CodeFileUnreadable:     "A --file needs to exist, be readable and hold one target per line of at most 64 KiB; - reads stdin.",
@@ -48,6 +50,7 @@ var remediations = map[string]string{
 var errorCodes = map[string]int{
 	CodeInvalidFlag:        ExitUsage,
 	CodeUnknownCommand:     ExitUsage,
+	CodeUnexpectedArgument: ExitUsage,
 	CodeInvalidTarget:      ExitUsage,
 	CodeMissingArguments:   ExitUsage,
 	CodeFileUnreadable:     ExitUsage,

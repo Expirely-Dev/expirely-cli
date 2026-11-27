@@ -32,3 +32,21 @@ func TestACMFindings(t *testing.T) {
 		t.Errorf("findings[1] = %+v, acm = %+v; want an ok ACM-issued certificate with an empty in_use_by", f, f.ACM)
 	}
 }
+
+func TestFindingsRevokedByACM(t *testing.T) {
+	now := time.Date(2026, 11, 26, 12, 0, 0, 0, time.UTC)
+	later, past := now.Add(90*24*time.Hour), now.Add(-time.Hour)
+	certs := []Certificate{
+		{ARN: "arn:1", Domain: "revoked.example.com", Status: "REVOKED", NotAfter: &later, RenewalStatus: "FAILED"},
+		{ARN: "arn:2", Domain: "gone.example.com", Status: "REVOKED", NotAfter: &past},
+	}
+
+	got := Findings(certs, "us-east-1", now, 30*24*time.Hour)
+
+	if got[0].Status != scan.StatusRevoked || got[0].ACM.RenewalStatus == nil || *got[0].ACM.RenewalStatus != "FAILED" {
+		t.Errorf("findings[0] = %s, acm = %+v; want revoked with renewal status FAILED", got[0].Status, got[0].ACM)
+	}
+	if got[1].Status != scan.StatusExpired || got[1].ACM.RenewalStatus != nil {
+		t.Errorf("findings[1] = %s, acm = %+v; want expired, which wins over revoked, and no renewal status", got[1].Status, got[1].ACM)
+	}
+}

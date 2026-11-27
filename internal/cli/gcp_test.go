@@ -101,7 +101,7 @@ func TestGCPErrors(t *testing.T) {
 		{name: "compute api disabled", f: gcptest.Fake{Status: http.StatusForbidden, Reason: "SERVICE_DISABLED"}, args: []string{"--project", "acme-prod"}, wantCode: ExitFailure, wantErr: CodeGCPComputeDisabled},
 		{name: "billing disabled", f: gcptest.Fake{Status: http.StatusForbidden, Reason: "BILLING_DISABLED"}, args: []string{"--project", "acme-prod"}, wantCode: ExitFailure, wantErr: CodeGCPComputeDisabled},
 		{name: "server error", f: gcptest.Fake{Status: http.StatusInternalServerError}, args: []string{"--project", "acme-prod", "--timeout", "2s"}, wantCode: ExitFailure, wantErr: CodeGCPRequestFailed},
-		{name: "targets are not accepted", f: gcptest.Fake{}, args: []string{"--project", "acme-prod", "example.com"}, wantCode: ExitUsage, wantErr: CodeInvalidFlag},
+		{name: "targets are not accepted", f: gcptest.Fake{}, args: []string{"--project", "acme-prod", "example.com"}, wantCode: ExitUsage, wantErr: CodeUnexpectedArgument},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

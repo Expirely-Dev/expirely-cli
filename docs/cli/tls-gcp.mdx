@@ -18,7 +18,7 @@ expirely tls gcp --project acme-production --json | jq '.results[] | select(.gcp
 | `--timeout DURATION` | Time allowed to read the project, such as `1m`. Default `30s`                                |
 | `--fields LIST`      | Keep only these keys in each JSON result, in the order the report prints them; `target` is always kept, and a key with no value is `null`. A comma list, or the flag repeated. Needs JSON output |
 | `--limit N`          | Show at most `N` results, `1` or more, most urgent first. No limit by default |
-| `--status LIST`      | Show only results with these statuses: `expired`, `expiring`, `error`, `unknown`, `ok`, or `all`. A comma list, or the flag repeated. Default `all`; a declared agent gets `expired,expiring,error,unknown` |
+| `--status LIST`      | Show only results with these statuses: `expired`, `revoked`, `expiring`, `error`, `unknown`, `ok`, or `all`. A comma list, or the flag repeated. Default `all`; a declared agent gets every status but `ok` |
 | `--json`             | Print JSON. Also the default when stdout is not a terminal                                   |
 | `-h`, `--help`       | Print the help as text and exit `0`                                                          |
 
@@ -46,7 +46,7 @@ Google renews a managed certificate. It never renews a self-managed one, which s
   ok        internal.example.com  203 days  Jun 17 2027  self-managed, in use by 1 resource
 ```
 
-A self-managed certificate in use is highlighted and listed first within its status. A managed certificate that is not issued yet has no end date. It is reported as `unknown`, with Google's state as its note, such as `provisioning` or `failed`, and makes the run exit `3`.
+A self-managed certificate in use is highlighted and listed first within its status. A managed certificate shows `renews itself` only while Google reports it `ACTIVE`; in any other state, such as `RENEWAL_FAILED`, the note is that state. A managed certificate that is not issued yet has no end date. It is reported as `unknown`, with Google's state as its note, such as `provisioning` or `failed`, and makes the run exit `3`.
 
 ## Permissions
 
@@ -79,4 +79,4 @@ While the project is read for longer than 150 ms, stderr shows `Reading the cert
 
 ## Exit codes
 
-The same as a scan: `0` when every certificate is `ok`, `1` when one is `expired` or `expiring`. A certificate with an `unknown` end date exits `3` unless another exits `1`. A missing project or credentials exit `2` with `gcp_not_configured`; refused credentials or missing permissions exit `3` with `gcp_access_denied`; a project with the Compute Engine API or billing disabled exits `3` with `gcp_compute_disabled`, since it serves no load balancer; and any other Google Cloud failure exits `3` with `gcp_request_failed`. A region or location Google cannot reach does not fail the run: expirely reports the certificates it read, names that place in `unreadable` (on stderr in text), and exits `3` unless a certificate it read exits `1`. Each code is in [Error codes](/reference/error-codes).
+The same as a scan: `0` when every certificate is `ok`, `1` when one is `expired`, `revoked` or `expiring`. A certificate with an `unknown` end date exits `3` unless another exits `1`. A missing project or credentials exit `2` with `gcp_not_configured`; refused credentials or missing permissions exit `3` with `gcp_access_denied`; a project with the Compute Engine API or billing disabled exits `3` with `gcp_compute_disabled`, since it serves no load balancer; and any other Google Cloud failure exits `3` with `gcp_request_failed`. A region or location Google cannot reach does not fail the run: expirely reports the certificates it read, names that place in `unreadable` (on stderr in text), and exits `3` unless a certificate it read exits `1`. Each code is in [Error codes](/reference/error-codes).

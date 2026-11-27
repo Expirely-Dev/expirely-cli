@@ -184,7 +184,7 @@ func TestAWSErrors(t *testing.T) {
 		{name: "no region", f: sampleACM(), region: "", wantCode: ExitUsage, wantErr: CodeAWSNotConfigured},
 		{name: "access denied", f: fakeACM{listErr: denied}, region: "us-east-1", wantCode: ExitFailure, wantErr: CodeAWSAccessDenied},
 		{name: "other failure", f: fakeACM{listErr: errors.New("connection reset")}, region: "us-east-1", wantCode: ExitFailure, wantErr: CodeAWSRequestFailed},
-		{name: "targets are not accepted", f: sampleACM(), region: "us-east-1", args: []string{"example.com"}, wantCode: ExitUsage, wantErr: CodeInvalidFlag},
+		{name: "targets are not accepted", f: sampleACM(), region: "us-east-1", args: []string{"example.com"}, wantCode: ExitUsage, wantErr: CodeUnexpectedArgument},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

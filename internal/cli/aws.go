@@ -18,7 +18,8 @@ import (
 
 const defaultAWSTimeout = 30 * time.Second
 
-const awsUsage = `expirely tls aws lists the certificates in AWS Certificate Manager and when they expire.
+const awsUsage = `expirely tls aws lists the certificates in AWS Certificate Manager and when
+they expire.
 
 Usage
   expirely tls aws [flags]
@@ -26,12 +27,13 @@ Usage
 Examples
   expirely tls aws --profile production --region us-east-1
   expirely tls aws --profile production --region all
-  AWS_PROFILE=production expirely tls aws --region us-east-1,eu-west-1 --warn-days 21
+  AWS_PROFILE=production expirely tls aws --region us-east-1,eu-west-1
 
 AWS
-      --profile NAME      profile from the shared AWS config (default AWS_PROFILE or the default chain)
-      --region REGION     region to read, a comma list, or all for every enabled region
-                          (default AWS_REGION or the profile's region)
+      --profile NAME      profile from the shared AWS config (default
+                          AWS_PROFILE, or the default credential chain)
+      --region REGION     a region, a comma list, or all for every enabled
+                          region (default AWS_REGION or the profile's region)
 
 Scan
       --warn-days N       flag certificates expiring within N days (default 30)
@@ -39,16 +41,12 @@ Scan
 
 Output
       --json              print JSON; the default when stdout is not a terminal
-      --status LIST       show only these statuses: expired, expiring, error, unknown, ok, all
-                          (default all; a declared agent gets expired,expiring,error,unknown)
-      --fields LIST       keep only these keys in each JSON result; target is always kept
-      --limit N           show at most N results, most urgent first
-  -h, --help              show this help
+` + viewUsage + `  -h, --help              show this help
 
-expirely tls aws only calls acm:ListCertificates and acm:DescribeCertificate, plus
-ec2:DescribeRegions for --region all, and changes nothing. A region it cannot
-read is listed in unreadable, and the run exits 3 unless a certificate it read
-exits 1.
+expirely tls aws only calls acm:ListCertificates and
+acm:DescribeCertificate, plus ec2:DescribeRegions for --region all, and
+changes nothing. A region it cannot read is listed in unreadable, and the run
+exits 3 unless a certificate it read exits 1.
 `
 
 // accessDenied are the AWS error codes that mean the credentials were
@@ -74,8 +72,8 @@ func runAWS(ctx context.Context, args []string, s Streams) int {
 	if done {
 		return code
 	}
-	if len(rest) > 0 {
-		return c.fail(failf(CodeInvalidFlag, "expirely tls aws takes no targets, got %q", rest[0]))
+	if code, done := c.noArguments("expirely tls aws", rest); done {
+		return code
 	}
 	if e := w.check(); e != nil {
 		return c.fail(e)
