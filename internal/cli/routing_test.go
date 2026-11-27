@@ -164,3 +164,40 @@ func TestHelpNamesEveryStatus(t *testing.T) {
 		}
 	}
 }
+
+func TestTextErrorsFitAnEightyColumnTerminal(t *testing.T) {
+	for code := range errorCodes {
+		var stderr bytes.Buffer
+		c := &command{Streams: Streams{Stderr: &stderr}}
+
+		c.fail(failf(code, "short message"))
+
+		lines := strings.Split(strings.TrimSuffix(stderr.String(), "\n"), "\n")
+		if lines[0] != "expirely: short message" {
+			t.Errorf("%s: first line = %q, want the message", code, lines[0])
+		}
+		if len(lines) < 2 {
+			t.Errorf("%s: stderr = %q, want the message and what resolves it", code, stderr.String())
+		}
+		for _, line := range lines {
+			if len(line) > textWidth {
+				t.Errorf("%s: a line of the text error has %d columns, over %d: %q", code, len(line), textWidth, line)
+			}
+		}
+		if got := strings.Join(lines[1:], " "); got != remediations[code] {
+			t.Errorf("%s: the wrapped remediation reads %q, want the words of %q", code, got, remediations[code])
+		}
+	}
+}
+
+func TestALongTextErrorMessageIsWrappedToo(t *testing.T) {
+	var stderr bytes.Buffer
+	c := &command{Streams: Streams{Stderr: &stderr}}
+
+	c.fail(failf(CodeGCPNotConfigured, "no Google Cloud project: none in --project, GOOGLE_CLOUD_PROJECT or CLOUDSDK_CORE_PROJECT"))
+
+	lines := strings.Split(stderr.String(), "\n")
+	if lines[0] != "expirely: no Google Cloud project: none in --project, GOOGLE_CLOUD_PROJECT or" || lines[1] != "CLOUDSDK_CORE_PROJECT" {
+		t.Errorf("stderr = %q, want the message wrapped at %d columns", stderr.String(), textWidth)
+	}
+}
